@@ -33,6 +33,12 @@ export default function Card({ card, playable, onField, canAttack, isOpponent, o
     <div className={classes} onClick={onClick}>
       <div className={styles.cost}>{card.cost}</div>
       <div className={styles.name}>{card.name}</div>
+      {card.image && (
+        <div className={styles.imageContainer}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={card.image} alt={card.name} className={styles.image} />
+        </div>
+      )}
       <div className={styles.flavor}>{card.flavor}</div>
       {card.type === 'creature' && attack !== undefined && health !== undefined ? (
         <div className={styles.stats}>
