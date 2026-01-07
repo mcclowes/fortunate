@@ -161,6 +161,72 @@ export const allCards: Card[] = [
     cost: 3,
     type: 'spell',
     image: `${ICON_BASE}/lorc/hourglass.svg`
+  },
+
+  // Delayed Effect Cards
+  {
+    id: 'bad-luck-curse',
+    name: 'Bad Luck Curse',
+    flavor: 'A black cat crosses their path. Then another. And another. This goes on for a while.',
+    cost: 3,
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/evil-moon.svg`
+  },
+  {
+    id: 'dark-omen',
+    name: 'Dark Omen',
+    flavor: 'The crows are circling. Something wicked this way comes. Eventually.',
+    cost: 2,
+    type: 'spell',
+    image: `${ICON_BASE}/delapouite/raven.svg`
+  },
+  {
+    id: 'blessing-of-ancients',
+    name: 'Blessing of the Ancients',
+    flavor: 'The old spirits smile upon you. They heal slowly, but surely, over time.',
+    cost: 4,
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/angel-outfit.svg`
+  },
+  {
+    id: 'temporal-siphon',
+    name: 'Temporal Siphon',
+    flavor: 'Slowly drains the future of your enemy. They feel weaker with each passing moment.',
+    cost: 3,
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/time-trap.svg`
+  },
+  {
+    id: 'fortunes-wheel',
+    name: 'Fortune\'s Wheel',
+    flavor: 'Spin the wheel of fate! Good luck comes to those who wait. Or bad luck. We\'ll see.',
+    cost: 2,
+    type: 'spell',
+    image: `${ICON_BASE}/delapouite/wheel-of-fortune.svg`
+  },
+  {
+    id: 'creeping-doom',
+    name: 'Creeping Doom',
+    flavor: 'It approaches slowly but inevitably. Every turn, the shadow grows longer.',
+    cost: 5,
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/death-zone.svg`
+  },
+  {
+    id: 'prophetic-vision',
+    name: 'Prophetic Vision',
+    flavor: 'See the threads of fate. Draw extra cards at the start of your next few turns.',
+    cost: 3,
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/crystal-ball.svg`
+  },
+  {
+    id: 'hex-of-weakness',
+    name: 'Hex of Weakness',
+    flavor: 'Their creatures grow feeble over time. The curse spreads like a slow poison.',
+    cost: 4,
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/cursed-star.svg`
   }
 ]
 

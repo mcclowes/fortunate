@@ -1,14 +1,17 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { GameState, Card, ResolveResponse, AITurnResponse, CreatureActionResponse, Creature, StateChange } from '@/lib/types'
+import { GameState, Card, ResolveResponse, AITurnResponse, CreatureActionResponse, Creature, StateChange, EffectTriggerResult } from '@/lib/types'
 import {
   createInitialGameState,
   playCard,
   endTurn,
   applyStateChanges,
   addLogEntry,
-  creatureAttack
+  creatureAttack,
+  processEffectTrigger,
+  getActiveEffects,
+  cleanupDeadCreatureEffects
 } from '@/lib/gameState'
 import { playSound, playSoundForStateChange, ensureAudioReady } from '@/lib/sounds'
 import { ParticleProvider, useParticles, ParticleType } from './ParticleEffect'
@@ -109,6 +112,42 @@ function BoardInner() {
       playSoundForStateChange(change.type)
     }
   }, [emit, gameState])
+
+  // Process triggered effects and return the updated state with log entries
+  const processTriggeredEffects = useCallback(async (
+    state: GameState,
+    trigger: 'start_of_turn' | 'end_of_turn',
+    who: 'player' | 'opponent'
+  ): Promise<GameState> => {
+    const { state: newState, results } = processEffectTrigger(state, trigger, who)
+
+    let finalState = newState
+
+    // Log and visualize each triggered effect
+    for (const result of results) {
+      if (result.changes.length > 0) {
+        // Emit particles for effect changes
+        result.changes.forEach(change => emitEffectForChange(change))
+
+        // Add log entry for the effect
+        const expiryText = result.expired ? ' (effect fades)' : ''
+        finalState = addLogEntry(
+          finalState,
+          'system',
+          `${result.effect.name}: ${result.effect.description}${expiryText}`
+        )
+
+        // Small delay between effects for visual feedback
+        setGameState(finalState)
+        await new Promise(r => setTimeout(r, 500))
+      }
+    }
+
+    // Clean up effects targeting dead creatures
+    finalState = cleanupDeadCreatureEffects(finalState)
+
+    return finalState
+  }, [emitEffectForChange])
 
   const parseSSEStream = useCallback(async (
     response: Response,
@@ -384,11 +423,21 @@ function BoardInner() {
         await new Promise(r => setTimeout(r, 1500))
       }
 
+      // Process end-of-turn effects for opponent
+      if (newState.phase !== 'ended') {
+        newState = await processTriggeredEffects(newState, 'end_of_turn', 'opponent')
+        setGameState(newState)
+      }
+
       // End turn
       if (newState.phase !== 'ended') {
         playSound('turnStart')
         newState = endTurn(newState)
         newState = addLogEntry(newState, 'system', 'Your turn begins.')
+        setGameState(newState)
+
+        // Process start-of-turn effects for player
+        newState = await processTriggeredEffects(newState, 'start_of_turn', 'player')
         setGameState(newState)
       }
       setIsLoading(false)
@@ -398,19 +447,41 @@ function BoardInner() {
       setGameState(addLogEntry(newState, 'system', 'The opponent ponders briefly, then ends their turn.'))
       setIsLoading(false)
     }
-  }, [resolveCardEffect, executeCreatureAction, emit])
+  }, [resolveCardEffect, executeCreatureAction, emit, processTriggeredEffects])
 
   const handleEndTurn = useCallback(async () => {
     if (!canAct || !gameState) return
 
+    setIsLoading(true)
+
+    // Process end-of-turn effects for player
+    let newState = await processTriggeredEffects(gameState, 'end_of_turn', 'player')
+
+    // Check if game ended from effects
+    if (newState.phase === 'ended') {
+      setGameState(newState)
+      setIsLoading(false)
+      return
+    }
+
     playSound('turnEnd')
-    let newState = endTurn(gameState)
+    newState = endTurn(newState)
     newState = addLogEntry(newState, 'system', "Opponent's turn begins.")
     setGameState(newState)
 
     await new Promise(r => setTimeout(r, 500))
+
+    // Process start-of-turn effects for opponent
+    newState = await processTriggeredEffects(newState, 'start_of_turn', 'opponent')
+    setGameState(newState)
+
+    if (newState.phase === 'ended') {
+      setIsLoading(false)
+      return
+    }
+
     await runOpponentTurn(newState)
-  }, [canAct, gameState, runOpponentTurn])
+  }, [canAct, gameState, runOpponentTurn, processTriggeredEffects])
 
   const handleRestart = useCallback(() => {
     setGameState(createInitialGameState())
@@ -507,6 +578,23 @@ function BoardInner() {
             <span>{isPlayerTurn ? 'Your turn - click a creature to activate it!' : "Opponent's turn"}</span>
           )}
         </div>
+
+        {/* Active Effects Display */}
+        {gameState.activeEffects.length > 0 && (
+          <div className={styles.activeEffects}>
+            <span className={styles.effectsLabel}>Active Effects:</span>
+            <div className={styles.effectsList}>
+              {gameState.activeEffects.map(effect => (
+                <div key={effect.id} className={styles.effectBadge} title={effect.description}>
+                  <span className={styles.effectName}>{effect.name}</span>
+                  {effect.turnsRemaining !== undefined && (
+                    <span className={styles.effectTurns}>{effect.turnsRemaining}t</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className={styles.controls}>
           <button
