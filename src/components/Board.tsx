@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { GameState, Card, ResolveResponse, AITurnResponse, CreatureActionResponse, Creature } from '@/lib/types'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { GameState, Card, ResolveResponse, AITurnResponse, CreatureActionResponse, Creature, StateChange } from '@/lib/types'
 import {
   createInitialGameState,
   playCard,
@@ -10,22 +10,105 @@ import {
   addLogEntry,
   creatureAttack
 } from '@/lib/gameState'
+import { playSound, playSoundForStateChange, ensureAudioReady } from '@/lib/sounds'
+import { ParticleProvider, useParticles, ParticleType } from './ParticleEffect'
 import Hand from './Hand'
 import Field from './Field'
 import GameLog from './GameLog'
 import styles from '@/styles/Board.module.scss'
 
 export default function Board() {
+  return (
+    <ParticleProvider>
+      <BoardInner />
+    </ParticleProvider>
+  )
+}
+
+function BoardInner() {
   const [gameState, setGameState] = useState<GameState | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [streamingText, setStreamingText] = useState<string>('')
+  const { emit } = useParticles()
+
+  // Refs for particle effect positioning
+  const playerFieldRef = useRef<HTMLDivElement>(null)
+  const opponentFieldRef = useRef<HTMLDivElement>(null)
+  const playerHealthRef = useRef<HTMLDivElement>(null)
+  const opponentHealthRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setGameState(createInitialGameState())
+    // Initialize audio on first user interaction
+    const handleInteraction = () => {
+      ensureAudioReady()
+      document.removeEventListener('click', handleInteraction)
+    }
+    document.addEventListener('click', handleInteraction)
+    return () => document.removeEventListener('click', handleInteraction)
   }, [])
+
+  // Play victory/defeat sounds and particles when game ends
+  useEffect(() => {
+    if (gameState?.phase === 'ended') {
+      if (gameState.winner === 'player') {
+        playSound('victory')
+        // Emit victory particles across the screen
+        emit('victory', window.innerWidth / 2, window.innerHeight / 2)
+        setTimeout(() => emit('victory', window.innerWidth / 3, window.innerHeight / 3), 200)
+        setTimeout(() => emit('victory', window.innerWidth * 2 / 3, window.innerHeight / 3), 400)
+      } else {
+        playSound('defeat')
+        emit('defeat', window.innerWidth / 2, window.innerHeight / 2)
+      }
+    }
+  }, [gameState?.phase, gameState?.winner, emit])
 
   const isPlayerTurn = gameState?.currentPlayer === 'player'
   const canAct = isPlayerTurn && gameState?.phase === 'playing' && !isLoading
+
+  // Helper to emit particles at a target location
+  const emitEffectForChange = useCallback((change: StateChange) => {
+    const getTargetRef = () => {
+      if (change.target === 'player') return playerHealthRef.current
+      if (change.target === 'opponent') return opponentHealthRef.current
+      // For creatures, we'd need to find the creature element
+      // For now, target the appropriate field
+      if (change.targetId) {
+        // Check if creature is on player or opponent field
+        if (gameState?.player.field.some(c => c.instanceId === change.targetId)) {
+          return playerFieldRef.current
+        }
+        if (gameState?.opponent.field.some(c => c.instanceId === change.targetId)) {
+          return opponentFieldRef.current
+        }
+      }
+      return null
+    }
+
+    const targetEl = getTargetRef()
+    if (!targetEl) return
+
+    const rect = targetEl.getBoundingClientRect()
+    const x = rect.left + rect.width / 2
+    const y = rect.top + rect.height / 2
+
+    // Map state change types to particle types
+    const particleMap: Record<string, ParticleType> = {
+      damage: 'damage',
+      heal: 'heal',
+      destroy: 'destroy',
+      buff: 'buff',
+      summon: 'summon',
+      draw: 'spell',
+    }
+
+    const particleType = particleMap[change.type]
+    if (particleType) {
+      emit(particleType, x, y)
+      playSoundForStateChange(change.type)
+    }
+  }, [emit, gameState])
 
   const parseSSEStream = useCallback(async (
     response: Response,
@@ -76,6 +159,12 @@ export default function Board() {
       }) as ResolveResponse
 
       setStreamingText('')
+
+      // Play effects for each state change
+      result.changes.forEach(change => {
+        emitEffectForChange(change)
+      })
+
       let newState = applyStateChanges(state, result.changes)
       newState = addLogEntry(newState, who, result.narrative)
       return newState
@@ -84,7 +173,7 @@ export default function Board() {
       setStreamingText('')
       return addLogEntry(state, 'system', `${card.name} fizzles mysteriously...`)
     }
-  }, [parseSSEStream])
+  }, [parseSSEStream, emitEffectForChange])
 
   const handlePlayCard = useCallback(async (cardIndex: number) => {
     if (!canAct || !gameState) return
@@ -92,13 +181,30 @@ export default function Board() {
     const result = playCard(gameState, 'player', cardIndex)
     if (!result) return
 
+    // Play sound based on card type
+    if (result.card.type === 'spell') {
+      playSound('spellCast')
+      // Emit spell particles at player's field
+      if (playerFieldRef.current) {
+        const rect = playerFieldRef.current.getBoundingClientRect()
+        emit('spell', rect.left + rect.width / 2, rect.top + rect.height / 2)
+      }
+    } else {
+      playSound('creatureSummon')
+      // Emit summon particles at player's field
+      if (playerFieldRef.current) {
+        const rect = playerFieldRef.current.getBoundingClientRect()
+        emit('summon', rect.left + rect.width / 2, rect.top + rect.height / 2)
+      }
+    }
+
     setIsLoading(true)
     setGameState({ ...result.state, phase: 'resolving' })
 
     const newState = await resolveCardEffect(result.state, result.card, 'player')
     setGameState({ ...newState, phase: 'playing' })
     setIsLoading(false)
-  }, [canAct, gameState, resolveCardEffect])
+  }, [canAct, gameState, resolveCardEffect, emit])
 
   const executeCreatureAction = useCallback(async (
     state: GameState,
@@ -133,6 +239,13 @@ export default function Board() {
 
       if (result.action === 'attack_hero') {
         const targetPlayer = owner === 'player' ? 'opponent' : 'player'
+        playSound('attack')
+        // Emit attack particles at the target hero
+        const targetRef = targetPlayer === 'player' ? playerHealthRef.current : opponentHealthRef.current
+        if (targetRef) {
+          const rect = targetRef.getBoundingClientRect()
+          emit('attack', rect.left + rect.width / 2, rect.top + rect.height / 2)
+        }
         newState = {
           ...newState,
           [targetPlayer]: {
@@ -141,8 +254,33 @@ export default function Board() {
           }
         }
       } else if (result.action === 'attack_creature' && result.targetId) {
+        playSound('attack')
+        // Emit attack particles at the target creature's field
+        const targetField = newState.player.field.some(c => c.instanceId === result.targetId)
+          ? playerFieldRef.current
+          : opponentFieldRef.current
+        if (targetField) {
+          const rect = targetField.getBoundingClientRect()
+          emit('attack', rect.left + rect.width / 2, rect.top + rect.height / 2)
+        }
         newState = creatureAttack(newState, creature.instanceId, result.targetId)
+        // Check if any creature was destroyed
+        const targetCreature = state.player.field.find(c => c.instanceId === result.targetId)
+          || state.opponent.field.find(c => c.instanceId === result.targetId)
+        const attackingCreature = state.player.field.find(c => c.instanceId === creature.instanceId)
+          || state.opponent.field.find(c => c.instanceId === creature.instanceId)
+        if (targetCreature && attackingCreature) {
+          // Check if target died
+          if (targetCreature.currentHealth <= attackingCreature.currentAttack) {
+            setTimeout(() => playSound('destroy'), 200)
+            if (targetField) {
+              const rect = targetField.getBoundingClientRect()
+              setTimeout(() => emit('destroy', rect.left + rect.width / 2, rect.top + rect.height / 2), 200)
+            }
+          }
+        }
       } else if (result.action === 'special' && result.changes) {
+        result.changes.forEach(change => emitEffectForChange(change))
         newState = applyStateChanges(newState, result.changes)
       }
 
@@ -161,7 +299,7 @@ export default function Board() {
       setStreamingText('')
       return addLogEntry(state, 'system', `${creature.name} hesitates, unsure what to do...`)
     }
-  }, [parseSSEStream])
+  }, [parseSSEStream, emit, emitEffectForChange])
 
   const handleCreatureClick = useCallback(async (instanceId: string) => {
     if (!canAct || !gameState) return
@@ -202,6 +340,20 @@ export default function Board() {
             const card = newState.opponent.hand[aiResponse.cardIndex]
             const result = playCard(newState, 'opponent', aiResponse.cardIndex)
             if (result) {
+              // Play sound based on card type
+              if (result.card.type === 'spell') {
+                playSound('spellCast')
+                if (opponentFieldRef.current) {
+                  const rect = opponentFieldRef.current.getBoundingClientRect()
+                  emit('spell', rect.left + rect.width / 2, rect.top + rect.height / 2)
+                }
+              } else {
+                playSound('creatureSummon')
+                if (opponentFieldRef.current) {
+                  const rect = opponentFieldRef.current.getBoundingClientRect()
+                  emit('summon', rect.left + rect.width / 2, rect.top + rect.height / 2)
+                }
+              }
               newState = result.state
               newState = addLogEntry(newState, 'opponent', `The opponent plays ${card.name}!`)
               newState = await resolveCardEffect(newState, result.card, 'opponent')
@@ -234,6 +386,7 @@ export default function Board() {
 
       // End turn
       if (newState.phase !== 'ended') {
+        playSound('turnStart')
         newState = endTurn(newState)
         newState = addLogEntry(newState, 'system', 'Your turn begins.')
         setGameState(newState)
@@ -245,11 +398,12 @@ export default function Board() {
       setGameState(addLogEntry(newState, 'system', 'The opponent ponders briefly, then ends their turn.'))
       setIsLoading(false)
     }
-  }, [resolveCardEffect, executeCreatureAction])
+  }, [resolveCardEffect, executeCreatureAction, emit])
 
   const handleEndTurn = useCallback(async () => {
     if (!canAct || !gameState) return
 
+    playSound('turnEnd')
     let newState = endTurn(gameState)
     newState = addLogEntry(newState, 'system', "Opponent's turn begins.")
     setGameState(newState)
@@ -282,7 +436,7 @@ export default function Board() {
           <div className={styles.heroInfo}>
             <span className={styles.heroName}>Opponent</span>
           </div>
-          <div className={styles.health}>
+          <div ref={opponentHealthRef} className={styles.health}>
             <span className={styles.icon}>❤️</span>
             {gameState.opponent.health}
           </div>
@@ -299,19 +453,23 @@ export default function Board() {
         />
 
         <div className={styles.battlefield}>
-          <Field
-            creatures={gameState.opponent.field}
-            isOpponent
-            onCreatureClick={handleCreatureClick}
-          />
+          <div ref={opponentFieldRef}>
+            <Field
+              creatures={gameState.opponent.field}
+              isOpponent
+              onCreatureClick={handleCreatureClick}
+            />
+          </div>
 
           <div className={styles.divider} />
 
-          <Field
-            creatures={gameState.player.field}
-            isPlayerTurn={isPlayerTurn}
-            onCreatureClick={handleCreatureClick}
-          />
+          <div ref={playerFieldRef}>
+            <Field
+              creatures={gameState.player.field}
+              isPlayerTurn={isPlayerTurn}
+              onCreatureClick={handleCreatureClick}
+            />
+          </div>
         </div>
 
         <Hand
@@ -325,7 +483,7 @@ export default function Board() {
           <div className={styles.heroInfo}>
             <span className={styles.heroName}>You</span>
           </div>
-          <div className={styles.health}>
+          <div ref={playerHealthRef} className={styles.health}>
             <span className={styles.icon}>❤️</span>
             {gameState.player.health}
           </div>
