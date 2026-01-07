@@ -39,3 +39,33 @@
 .narrative {
   color: var(--text);
 }
+
+// Mobile responsive styles
+@media (max-width: 768px) {
+  .log {
+    height: 150px;
+    padding: 12px;
+    gap: 6px;
+  }
+
+  .entry {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  .turn {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 480px) {
+  .log {
+    height: 120px;
+    padding: 8px;
+  }
+
+  .entry {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+}
