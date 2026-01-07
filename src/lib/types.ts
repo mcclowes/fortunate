@@ -6,6 +6,7 @@ export type Card = {
   flavor: string
   cost: number
   type: CardType
+  image?: string
   baseStats?: {
     attack: number
     health: number
