@@ -13,7 +13,6 @@ export type Card = {
   id: string
   name: string
   flavor: string
-  cost: number
   type: CardType
   image?: string
   baseStats?: {
@@ -37,8 +36,6 @@ export type Creature = Card & {
 
 export type PlayerState = {
   health: number
-  mana: number
-  maxMana: number
   hand: Card[]
   deck: Card[]
   field: Creature[]
@@ -59,6 +56,7 @@ export type GameState = {
   log: GameEvent[]
   phase: 'playing' | 'resolving' | 'combat' | 'ended'
   winner?: 'player' | 'opponent'
+  hasPlayedCard: boolean  // Track if current player has played their one card this turn
 }
 
 export type StateChange = {
@@ -72,10 +70,6 @@ export type StateChange = {
     // Newly implemented
     | 'summon'           // Summon a token creature
     | 'discard'          // Discard cards from hand
-    // Mana effects
-    | 'gain_mana'        // Gain temporary mana this turn
-    | 'steal_mana'       // Steal mana from opponent
-    | 'modify_max_mana'  // Change max mana permanently
     // Debuffs
     | 'debuff'           // Reduce creature stats (separate attack/health)
     // Status effects
@@ -111,11 +105,17 @@ export type ResolveResponse = {
 }
 
 export type AITurnResponse = {
-  action: 'play' | 'attack' | 'end_turn'
+  action: 'play' | 'pass'
   cardIndex?: number
-  attackerId?: string
-  targetId?: string
   narrative: string
+}
+
+export type CombatPhaseResponse = {
+  narrative: string
+  attacks: Array<{
+    attackerId: string
+    targetId: string | 'hero'  // 'hero' means attack the enemy hero
+  }>
 }
 
 export type CreatureActionResponse = {

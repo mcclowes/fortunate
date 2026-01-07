@@ -9,15 +9,11 @@ export async function POST(request: NextRequest) {
   try {
     const { gameState } = await request.json() as { gameState: GameState }
 
-    // Check if AI has any playable cards or attackers
-    const hasPlayableCards = gameState.opponent.hand.some(c => c.cost <= gameState.opponent.mana)
-    const hasAttackers = gameState.opponent.field.some(c => c.canAttack)
-
-    // If nothing to do, end turn immediately
-    if (!hasPlayableCards && !hasAttackers) {
+    // If no cards in hand, pass immediately
+    if (gameState.opponent.hand.length === 0) {
       return NextResponse.json({
-        action: 'end_turn',
-        narrative: 'Nothing more to do this turn...'
+        action: 'pass',
+        narrative: 'No cards to play...'
       } satisfies AITurnResponse)
     }
 
@@ -49,22 +45,11 @@ export async function POST(request: NextRequest) {
     // Validate the action
     if (result.action === 'play') {
       const card = gameState.opponent.hand[result.cardIndex ?? -1]
-      if (!card || card.cost > gameState.opponent.mana) {
-        // Invalid play, end turn instead
+      if (!card) {
+        // Invalid card index, pass instead
         return NextResponse.json({
-          action: 'end_turn',
-          narrative: 'Hmm, that won\'t work. I end my turn.'
-        } satisfies AITurnResponse)
-      }
-    }
-
-    if (result.action === 'attack') {
-      const attacker = gameState.opponent.field.find(c => c.instanceId === result.attackerId)
-      if (!attacker || !attacker.canAttack) {
-        // Invalid attack, end turn instead
-        return NextResponse.json({
-          action: 'end_turn',
-          narrative: 'My minions are exhausted. I end my turn.'
+          action: 'pass',
+          narrative: 'Hmm, that won\'t work. I pass.'
         } satisfies AITurnResponse)
       }
     }
@@ -73,9 +58,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('AI turn error:', error)
 
-    // Fallback: try to play first affordable card or end turn
+    // Fallback: pass
     return NextResponse.json({
-      action: 'end_turn',
+      action: 'pass',
       narrative: 'The opponent contemplates deeply, then passes.'
     } satisfies AITurnResponse)
   }

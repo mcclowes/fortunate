@@ -6,8 +6,6 @@ function createPlayerState(): PlayerState {
   const hand = deck.splice(0, 4) // Draw 4 starting cards
   return {
     health: 30,
-    mana: 1,
-    maxMana: 1,
     hand,
     deck,
     field: []
@@ -26,7 +24,8 @@ export function createInitialGameState(): GameState {
       narrative: 'The battle begins! Two champions face off in a contest of wit and whimsy.',
       timestamp: Date.now()
     }],
-    phase: 'playing'
+    phase: 'playing',
+    hasPlayedCard: false
   }
 }
 
@@ -49,7 +48,8 @@ export function playCard(state: GameState, who: 'player' | 'opponent', cardIndex
   const playerState = state[who]
   const card = playerState.hand[cardIndex]
 
-  if (!card || card.cost > playerState.mana) return null
+  // Can only play one card per turn
+  if (!card || state.hasPlayedCard) return null
 
   const newHand = [...playerState.hand]
   newHand.splice(cardIndex, 1)
@@ -69,9 +69,9 @@ export function playCard(state: GameState, who: 'player' | 'opponent', cardIndex
   return {
     state: {
       ...state,
+      hasPlayedCard: true,
       [who]: {
         ...playerState,
-        mana: playerState.mana - card.cost,
         hand: newHand,
         field: newField
       }
@@ -166,55 +166,6 @@ export function applyStateChanges(state: GameState, changes: StateChange[]): Gam
       case 'mill':
         const miller = change.target === 'player' ? 'player' : 'opponent'
         newState = millCards(newState, miller, change.value || 1)
-        break
-
-      case 'gain_mana':
-        if (change.target === 'player') {
-          newState = {
-            ...newState,
-            player: { ...newState.player, mana: newState.player.mana + (change.value || 1) }
-          }
-        } else if (change.target === 'opponent') {
-          newState = {
-            ...newState,
-            opponent: { ...newState.opponent, mana: newState.opponent.mana + (change.value || 1) }
-          }
-        }
-        break
-
-      case 'steal_mana':
-        const stolen = Math.min(change.value || 1, change.target === 'opponent' ? newState.opponent.mana : newState.player.mana)
-        if (change.target === 'opponent') {
-          // Steal from opponent, give to player
-          newState = {
-            ...newState,
-            player: { ...newState.player, mana: newState.player.mana + stolen },
-            opponent: { ...newState.opponent, mana: newState.opponent.mana - stolen }
-          }
-        } else {
-          // Steal from player, give to opponent
-          newState = {
-            ...newState,
-            player: { ...newState.player, mana: newState.player.mana - stolen },
-            opponent: { ...newState.opponent, mana: newState.opponent.mana + stolen }
-          }
-        }
-        break
-
-      case 'modify_max_mana':
-        if (change.target === 'player') {
-          const newMax = Math.max(0, Math.min(10, newState.player.maxMana + (change.value || 0)))
-          newState = {
-            ...newState,
-            player: { ...newState.player, maxMana: newMax, mana: Math.min(newState.player.mana, newMax) }
-          }
-        } else if (change.target === 'opponent') {
-          const newMax = Math.max(0, Math.min(10, newState.opponent.maxMana + (change.value || 0)))
-          newState = {
-            ...newState,
-            opponent: { ...newState.opponent, maxMana: newMax, mana: Math.min(newState.opponent.mana, newMax) }
-          }
-        }
         break
 
       case 'apply_status':
@@ -541,7 +492,6 @@ function bounceCreature(state: GameState, instanceId: string): GameState {
       id: creature.id,
       name: creature.name,
       flavor: creature.flavor,
-      cost: creature.cost,
       type: creature.type,
       image: creature.image,
       baseStats: creature.baseStats
@@ -570,7 +520,6 @@ function bounceCreature(state: GameState, instanceId: string): GameState {
       id: creature.id,
       name: creature.name,
       flavor: creature.flavor,
-      cost: creature.cost,
       type: creature.type,
       image: creature.image,
       baseStats: creature.baseStats
@@ -642,7 +591,7 @@ export function endTurn(state: GameState): GameState {
       .filter(c => c.currentHealth > 0)
   }
 
-  // Refresh mana and allow creatures to attack (except frozen)
+  // Refresh creatures to attack (except frozen)
   const refreshPlayer = (ps: PlayerState, isActive: boolean): PlayerState => {
     if (!isActive) {
       // End of turn: process doomed
@@ -657,8 +606,6 @@ export function endTurn(state: GameState): GameState {
 
     return {
       ...ps,
-      mana: Math.min(10, ps.maxMana + 1),
-      maxMana: Math.min(10, ps.maxMana + 1),
       field: processedField.map(c => {
         const effects = c.statusEffects || []
         // Frozen creatures can't attack and lose frozen status
@@ -681,7 +628,8 @@ export function endTurn(state: GameState): GameState {
     currentPlayer: nextPlayer,
     player: refreshPlayer(state.player, nextPlayer === 'player'),
     opponent: refreshPlayer(state.opponent, nextPlayer === 'opponent'),
-    phase: 'playing'
+    phase: 'playing',
+    hasPlayedCard: false
   }
 
   // Draw a card for the new active player
@@ -796,4 +744,34 @@ export function hasStatus(creature: Creature, status: StatusEffect): boolean {
 // Helper to get taunt creatures for targeting validation
 export function getTauntCreatures(state: GameState, who: 'player' | 'opponent'): Creature[] {
   return state[who].field.filter(c => c.statusEffects?.includes('taunt'))
+}
+
+// Execute batch combat - all creatures of a player attack in sequence
+export function executeBatchCombat(
+  state: GameState,
+  who: 'player' | 'opponent',
+  attacks: Array<{ attackerId: string; targetId: string | 'hero' }>
+): GameState {
+  let newState = { ...state }
+  const enemy = who === 'player' ? 'opponent' : 'player'
+
+  for (const attack of attacks) {
+    // Find the attacking creature (it must still be alive and able to attack)
+    const attacker = newState[who].field.find(c => c.instanceId === attack.attackerId)
+    if (!attacker || !attacker.canAttack) continue
+    if (attacker.statusEffects?.includes('frozen')) continue
+
+    if (attack.targetId === 'hero') {
+      // Attack the enemy hero
+      newState = creatureAttack(newState, attack.attackerId, enemy)
+    } else {
+      // Attack a creature
+      newState = creatureAttack(newState, attack.attackerId, attack.targetId)
+    }
+
+    // Check win condition after each attack
+    if (newState.phase === 'ended') break
+  }
+
+  return newState
 }

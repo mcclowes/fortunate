@@ -36,12 +36,10 @@ StateChange types:
 - {"type": "draw", "target": "player|opponent", "value": count}
 - {"type": "discard", "target": "player|opponent", "value": count}
 - {"type": "mill", "target": "player|opponent", "value": count} (removes from deck)
-- {"type": "gain_mana", "target": "player|opponent", "value": amount}
-- {"type": "steal_mana", "target": "opponent", "value": amount} (steals from target)
 - {"type": "apply_status", "target": "creature", "targetId": "id", "status": "frozen|poisoned|taunt|stealth|silenced|doomed"}
 - {"type": "remove_status", "target": "creature", "targetId": "id", "status": "status-name"}
 - {"type": "add_shield", "target": "creature", "targetId": "id", "value": amount}
-- {"type": "summon", "target": "player|opponent", "card": {id,name,flavor,cost,type:"creature",baseStats:{attack,health}}}
+- {"type": "summon", "target": "player|opponent", "card": {id,name,flavor,type:"creature",baseStats:{attack,health}}}
 - {"type": "steal_creature", "target": "creature", "targetId": "creature-id"}
 - {"type": "transform", "target": "creature", "targetId": "id", "card": {creature-card}}
 - {"type": "copy_creature", "target": "player|opponent", "targetId": "creature-to-copy"}
@@ -49,7 +47,7 @@ StateChange types:
 
 Status effects: frozen (skip attack), poisoned (1 dmg/turn), taunt (must be attacked), stealth (untargetable), silenced (no abilities), doomed (dies end of turn)
 
-Effect scale: 1-cost = 1-2 damage/+1 buff. 3-cost = 2-3 damage or status. 5-cost = 4-5 damage or multiple effects. Creatures already summoned - describe entry effects only.`
+Effect scale: Small effects = 1-2 damage/+1 buff. Medium effects = 2-3 damage or status. Big effects = 4-5 damage or multiple effects. Creatures already summoned - describe entry effects only.`
 
 export function createResolvePrompt(gameState: GameState, card: Card, who: 'player' | 'opponent'): string {
   const caster = gameState[who]
@@ -59,27 +57,27 @@ export function createResolvePrompt(gameState: GameState, card: Card, who: 'play
   const battleHistory = formatBattleHistory(gameState.log)
 
   return `${battleHistory}Turn ${gameState.turn} - ${who === 'player' ? 'Hero' : 'Opponent'} plays:
-${card.name} (${card.type}, ${card.cost} mana): "${card.flavor}"
-Caster: ${caster.health}hp, ${caster.mana}/${caster.maxMana} mana, creatures: ${friendlyCreatures}
+${card.name} (${card.type}): "${card.flavor}"
+Caster: ${caster.health}hp, creatures: ${friendlyCreatures}
 Enemy: ${enemy.health}hp, creatures: ${enemyCreatures}
 ${card.type === 'creature' ? 'Creature summoned - describe entry effect.' : 'Cast spell effect.'}`
 }
 
 export const AI_TURN_SYSTEM_PROMPT = `AI opponent in card game. Pick ONE action. JSON only:
-{"action": "play|end_turn", "cardIndex": 0, "narrative": "brief quip"}
-Priority: play affordable cards > end turn.
+{"action": "play|pass", "cardIndex": 0, "narrative": "brief quip"}
+You can play exactly one card per turn, or pass to skip.
 
 Your narrative should acknowledge the battle's momentum - are you pressing an advantage, making a desperate play, or biding your time?`
 
 export function createAITurnPrompt(gameState: GameState): string {
   const opponent = gameState.opponent
   const player = gameState.player
-  const hand = opponent.hand.map((c, i) => `${i}:${c.name}(${c.cost})`).join(' ')
-  const battleHistory = formatBattleHistory(gameState.log, 4) // Fewer events for decisions
+  const hand = opponent.hand.map((c, i) => `${i}:${c.name}`).join(' ')
+  const battleHistory = formatBattleHistory(gameState.log, 4)
 
   return `${battleHistory}Turn ${gameState.turn} - Your move.
 Your health: ${opponent.health}hp | Enemy health: ${player.health}hp
-Mana:${opponent.mana} Hand:[${hand}] Pick card index to play or end_turn.`
+Hand:[${hand}] Pick ONE card index to play, or "pass" to skip playing a card.`
 }
 
 export const CREATURE_ACTION_SYSTEM_PROMPT = `Creature acts based on personality. JSON only:
@@ -112,4 +110,53 @@ export function createCreatureActionPrompt(
   return `${battleHistory}Turn ${gameState.turn} - ${creature.name} acts!
 ${creature.name}(${creature.currentAttack}/${creature.currentHealth})${creatureStatus}: "${creature.flavor}"
 Enemy: ${enemyState.health}hp, creatures: ${enemies}${tauntWarning}`
+}
+
+// Combat phase prompt - resolves all creature attacks in one narrative
+export const COMBAT_PHASE_SYSTEM_PROMPT = `You are the narrator for a combat phase in a whimsical card game. All creatures attack automatically.
+
+Respond with JSON only:
+{"narrative": "Dramatic 2-4 sentence narrative describing ALL attacks", "attacks": [{"attackerId": "id", "targetId": "id-or-hero"}, ...]}
+
+Rules:
+- Each creature that canAttack MUST be included in the attacks array
+- Creatures with frozen status CANNOT attack (skip them)
+- If enemy has TAUNT creatures, those must be targeted first
+- STEALTH creatures cannot be targeted
+- Use "hero" as targetId to attack the enemy hero directly
+- Make the narrative dramatic and fun! Describe each creature's attack with personality
+- Build on battle history - reference grudges, revenge, heroic moments
+
+IMPORTANT: Every creature that can attack should attack. The "attacks" array should have one entry per attacking creature.`
+
+export function createCombatPhasePrompt(
+  gameState: GameState,
+  who: 'player' | 'opponent'
+): string {
+  const attacker = gameState[who]
+  const defender = gameState[who === 'player' ? 'opponent' : 'player']
+
+  const attackers = attacker.field
+    .filter(c => c.canAttack && !c.statusEffects?.includes('frozen'))
+    .map(formatCreature)
+    .join(', ') || 'none'
+
+  const defenders = defender.field.map(formatCreature).join(', ') || 'none'
+  const tauntCreatures = defender.field
+    .filter(c => c.statusEffects?.includes('taunt'))
+    .map(c => c.instanceId)
+
+  const battleHistory = formatBattleHistory(gameState.log)
+
+  const tauntNote = tauntCreatures.length > 0
+    ? `\nTAUNT creatures (must be attacked first): ${tauntCreatures.join(', ')}`
+    : ''
+
+  return `${battleHistory}Turn ${gameState.turn} - COMBAT PHASE for ${who === 'player' ? 'Hero' : 'Opponent'}!
+
+Attacking creatures: ${attackers}
+Enemy hero: ${defender.health}hp
+Enemy creatures: ${defenders}${tauntNote}
+
+Narrate all attacks dramatically and specify each creature's target.`
 }
