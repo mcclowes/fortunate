@@ -431,6 +431,59 @@ export const allCards: Card[] = [
     type: 'creature',
     image: `${ICON_BASE}/lorc/beehive.svg`,
     baseStats: { attack: 2, health: 3 }
+  },
+
+  // Card draw cards
+  {
+    id: 'curious-cat',
+    name: 'Curious Cat',
+    flavor: 'Knocked over your deck just to see what was inside.',
+    cost: 1,
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/cat.svg`,
+    baseStats: { attack: 1, health: 1 }
+  },
+  {
+    id: 'knowledge-hoarder',
+    name: 'Knowledge Hoarder',
+    flavor: 'Collects facts like others collect coins. Equally useless in combat.',
+    cost: 3,
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/raven.svg`,
+    baseStats: { attack: 2, health: 3 }
+  },
+  {
+    id: 'library-card',
+    name: 'Library Card',
+    flavor: 'The most powerful card of all. Grants access to infinite knowledge. And late fees.',
+    cost: 1,
+    type: 'spell',
+    image: `${ICON_BASE}/delapouite/bookmarklet.svg`
+  },
+  {
+    id: 'eureka-moment',
+    name: 'Eureka Moment',
+    flavor: 'That feeling when you finally understand. Then immediately forget.',
+    cost: 3,
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/light-bulb.svg`
+  },
+  {
+    id: 'scroll-scrounger',
+    name: 'Scroll Scrounger',
+    flavor: 'One wizard\'s trash is another wizard\'s treasure. Mostly trash though.',
+    cost: 2,
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/scroll-unfurled.svg`,
+    baseStats: { attack: 1, health: 2 }
+  },
+  {
+    id: 'desperate-research',
+    name: 'Desperate Research',
+    flavor: 'When the deadline looms, any source becomes valid. Even this one.',
+    cost: 2,
+    type: 'spell',
+    image: `${ICON_BASE}/delapouite/bookshelf.svg`
   }
 ]
 
