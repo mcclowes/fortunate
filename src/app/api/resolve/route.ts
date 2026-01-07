@@ -40,6 +40,22 @@ export async function POST(request: NextRequest) {
         const jsonMatch = fullText.match(/\{[\s\S]*\}/)
         if (jsonMatch) {
           const result: ResolveResponse = JSON.parse(jsonMatch[0])
+
+          // Transform targets based on who played the card
+          // Claude generates targets from the caster's perspective (their "opponent" = their enemy)
+          // But GameState uses fixed "player" = human, "opponent" = AI
+          // So when AI plays a card, we need to swap the targets
+          if (who === 'opponent' && result.changes) {
+            result.changes = result.changes.map(change => {
+              if (change.target === 'player') {
+                return { ...change, target: 'opponent' as const }
+              } else if (change.target === 'opponent') {
+                return { ...change, target: 'player' as const }
+              }
+              return change
+            })
+          }
+
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'result', ...result })}\n\n`))
         } else {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
