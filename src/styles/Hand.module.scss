@@ -16,3 +16,21 @@
     pointer-events: none;
   }
 }
+
+// Mobile responsive styles
+@media (max-width: 768px) {
+  .hand {
+    gap: 4px;
+    padding: 8px;
+    min-height: 150px;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .hand {
+    gap: 2px;
+    padding: 6px;
+    min-height: 120px;
+  }
+}

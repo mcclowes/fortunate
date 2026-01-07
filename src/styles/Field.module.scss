@@ -23,3 +23,30 @@
 .player {
   background: rgba(74, 158, 255, 0.1);
 }
+
+// Mobile responsive styles
+@media (max-width: 768px) {
+  .field {
+    gap: 6px;
+    padding: 12px;
+    min-height: 130px;
+    flex-wrap: wrap;
+  }
+
+  .empty {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .field {
+    gap: 4px;
+    padding: 8px;
+    min-height: 110px;
+    margin: 4px 0;
+  }
+
+  .empty {
+    font-size: 11px;
+  }
+}

@@ -6,6 +6,12 @@ export const metadata: Metadata = {
   description: 'A card game where an LLM interprets the rules',
 }
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+}
+
 export default function RootLayout({
   children,
 }: {
