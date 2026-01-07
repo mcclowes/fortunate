@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { GameState, Card, ResolveResponse, AITurnResponse, CreatureActionResponse, Creature, StateChange } from '@/lib/types'
+import { GameState, Card, ResolveResponse, AITurnResponse, CombatPhaseResponse, StateChange } from '@/lib/types'
 import {
   createInitialGameState,
   playCard,
   endTurn,
   applyStateChanges,
   addLogEntry,
-  creatureAttack
+  executeBatchCombat
 } from '@/lib/gameState'
 import { playSound, playSoundForStateChange, ensureAudioReady } from '@/lib/sounds'
 import { ParticleProvider, useParticles, ParticleType } from './ParticleEffect'
@@ -123,15 +123,15 @@ function BoardInner() {
     }
   }, [emit, gameState])
 
-  const parseSSEStream = useCallback(async (
+  const parseSSEStream = useCallback(async <T extends ResolveResponse | CombatPhaseResponse>(
     response: Response,
     onText: (text: string) => void
-  ): Promise<ResolveResponse | CreatureActionResponse> => {
+  ): Promise<T> => {
     const reader = response.body?.getReader()
     if (!reader) throw new Error('No reader')
 
     const decoder = new TextDecoder()
-    let result: ResolveResponse | CreatureActionResponse | null = null
+    let result: T | null = null
 
     while (true) {
       const { done, value } = await reader.read()
@@ -146,7 +146,7 @@ function BoardInner() {
           if (data.type === 'text') {
             onText(data.text)
           } else if (data.type === 'result') {
-            result = data
+            result = data as T
           }
         }
       }
@@ -188,8 +188,92 @@ function BoardInner() {
     }
   }, [parseSSEStream, emitEffectForChange])
 
+  // Execute combat phase - all creatures attack via a single AI prompt
+  const executeCombatPhase = useCallback(async (
+    state: GameState,
+    who: 'player' | 'opponent'
+  ): Promise<GameState> => {
+    // Check if there are any creatures that can attack
+    const attackers = state[who].field.filter(
+      c => c.canAttack && !c.statusEffects?.includes('frozen')
+    )
+
+    if (attackers.length === 0) {
+      return state // No combat needed
+    }
+
+    try {
+      setStreamingText('')
+      const response = await fetch('/api/combat-phase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameState: state, who })
+      })
+
+      if (!response.ok) throw new Error('Failed to execute combat')
+
+      const result = await parseSSEStream<CombatPhaseResponse>(response, (text) => {
+        setStreamingText(prev => prev + text)
+      })
+
+      setStreamingText('')
+
+      if (result.attacks.length === 0) {
+        return state
+      }
+
+      // Play attack sounds and emit particles
+      playSound('attack')
+      const targetRef = who === 'player' ? opponentHealthRef.current : playerHealthRef.current
+      if (targetRef) {
+        const rect = targetRef.getBoundingClientRect()
+        emit('attack', rect.left + rect.width / 2, rect.top + rect.height / 2)
+      }
+
+      // Execute all attacks
+      let newState = executeBatchCombat(state, who, result.attacks)
+
+      // Add combat narrative to log
+      if (result.narrative) {
+        newState = addLogEntry(newState, who, result.narrative)
+      }
+
+      return newState
+    } catch (error) {
+      console.error('Combat phase error:', error)
+      setStreamingText('')
+      return addLogEntry(state, 'system', 'The creatures hesitate...')
+    }
+  }, [parseSSEStream, emit])
+
+  // Complete the player's turn: combat phase -> end turn -> opponent turn
+  const completePlayerTurn = useCallback(async (state: GameState) => {
+    setIsLoading(true)
+
+    // Combat phase
+    setGameState({ ...state, phase: 'combat' })
+    let newState = await executeCombatPhase(state, 'player')
+    setGameState(newState)
+
+    if (newState.phase === 'ended') {
+      setIsLoading(false)
+      return
+    }
+
+    await new Promise(r => setTimeout(r, 500))
+
+    // End turn and start opponent's turn
+    playSound('turnEnd')
+    newState = endTurn(newState)
+    newState = addLogEntry(newState, 'system', "Opponent's turn begins.")
+    setGameState(newState)
+
+    await new Promise(r => setTimeout(r, 500))
+    await runOpponentTurn(newState)
+  }, [executeCombatPhase])
+
   const handlePlayCard = useCallback(async (cardIndex: number) => {
-    if (!canAct || !gameState) return
+    if (!canAct || !gameState || gameState.hasPlayedCard) return
 
     const result = playCard(gameState, 'player', cardIndex)
     if (!result) return
@@ -197,14 +281,12 @@ function BoardInner() {
     // Play sound based on card type
     if (result.card.type === 'spell') {
       playSound('spellCast')
-      // Emit spell particles at player's field
       if (playerFieldRef.current) {
         const rect = playerFieldRef.current.getBoundingClientRect()
         emit('spell', rect.left + rect.width / 2, rect.top + rect.height / 2)
       }
     } else {
       playSound('creatureSummon')
-      // Emit summon particles at player's field
       if (playerFieldRef.current) {
         const rect = playerFieldRef.current.getBoundingClientRect()
         emit('summon', rect.left + rect.width / 2, rect.top + rect.height / 2)
@@ -214,196 +296,94 @@ function BoardInner() {
     setIsLoading(true)
     setGameState({ ...result.state, phase: 'resolving' })
 
-    const newState = await resolveCardEffect(result.state, result.card, 'player')
-    setGameState({ ...newState, phase: 'playing' })
-    setIsLoading(false)
-  }, [canAct, gameState, resolveCardEffect, emit])
+    // Resolve card effect
+    let newState = await resolveCardEffect(result.state, result.card, 'player')
+    setGameState(newState)
 
-  const executeCreatureAction = useCallback(async (
-    state: GameState,
-    creature: Creature,
-    owner: 'player' | 'opponent'
-  ): Promise<GameState> => {
-    try {
-      setStreamingText('')
-      const response = await fetch('/api/creature-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameState: state, creature, owner })
-      })
-      if (!response.ok) throw new Error('Failed to get creature action')
-
-      const result = await parseSSEStream(response, (text) => {
-        setStreamingText(prev => prev + text)
-      }) as CreatureActionResponse
-
-      setStreamingText('')
-      let newState = state
-
-      // Mark creature as having acted
-      const updateField = (field: Creature[]) =>
-        field.map(c => c.instanceId === creature.instanceId ? { ...c, canAttack: false } : c)
-
-      if (owner === 'player') {
-        newState = { ...newState, player: { ...newState.player, field: updateField(newState.player.field) } }
-      } else {
-        newState = { ...newState, opponent: { ...newState.opponent, field: updateField(newState.opponent.field) } }
-      }
-
-      if (result.action === 'attack_hero') {
-        const targetPlayer = owner === 'player' ? 'opponent' : 'player'
-        playSound('attack')
-        // Emit attack particles at the target hero
-        const targetRef = targetPlayer === 'player' ? playerHealthRef.current : opponentHealthRef.current
-        if (targetRef) {
-          const rect = targetRef.getBoundingClientRect()
-          emit('attack', rect.left + rect.width / 2, rect.top + rect.height / 2)
-        }
-        newState = {
-          ...newState,
-          [targetPlayer]: {
-            ...newState[targetPlayer],
-            health: newState[targetPlayer].health - creature.currentAttack
-          }
-        }
-      } else if (result.action === 'attack_creature' && result.targetId) {
-        playSound('attack')
-        // Emit attack particles at the target creature's field
-        const targetField = newState.player.field.some(c => c.instanceId === result.targetId)
-          ? playerFieldRef.current
-          : opponentFieldRef.current
-        if (targetField) {
-          const rect = targetField.getBoundingClientRect()
-          emit('attack', rect.left + rect.width / 2, rect.top + rect.height / 2)
-        }
-        newState = creatureAttack(newState, creature.instanceId, result.targetId)
-        // Check if any creature was destroyed
-        const targetCreature = state.player.field.find(c => c.instanceId === result.targetId)
-          || state.opponent.field.find(c => c.instanceId === result.targetId)
-        const attackingCreature = state.player.field.find(c => c.instanceId === creature.instanceId)
-          || state.opponent.field.find(c => c.instanceId === creature.instanceId)
-        if (targetCreature && attackingCreature) {
-          // Check if target died
-          if (targetCreature.currentHealth <= attackingCreature.currentAttack) {
-            setTimeout(() => playSound('destroy'), 200)
-            if (targetField) {
-              const rect = targetField.getBoundingClientRect()
-              setTimeout(() => emit('destroy', rect.left + rect.width / 2, rect.top + rect.height / 2), 200)
-            }
-          }
-        }
-      } else if (result.action === 'special' && result.changes) {
-        result.changes.forEach(change => emitEffectForChange(change))
-        newState = applyStateChanges(newState, result.changes)
-      }
-
-      newState = addLogEntry(newState, owner, result.narrative)
-
-      // Check win condition
-      if (newState.player.health <= 0) {
-        newState = { ...newState, phase: 'ended', winner: 'opponent' }
-      } else if (newState.opponent.health <= 0) {
-        newState = { ...newState, phase: 'ended', winner: 'player' }
-      }
-
-      return newState
-    } catch (error) {
-      console.error('Creature action error:', error)
-      setStreamingText('')
-      return addLogEntry(state, 'system', `${creature.name} hesitates, unsure what to do...`)
-    }
-  }, [parseSSEStream, emit, emitEffectForChange])
-
-  const handleCreatureClick = useCallback(async (instanceId: string) => {
-    if (!canAct || !gameState) return
-
-    const playerCreature = gameState.player.field.find(c => c.instanceId === instanceId)
-
-    // Only allow clicking on player's creatures that can attack
-    if (playerCreature && playerCreature.canAttack) {
-      setIsLoading(true)
-      const newState = await executeCreatureAction(gameState, playerCreature, 'player')
-      setGameState(newState)
+    if (newState.phase === 'ended') {
       setIsLoading(false)
+      return
     }
-  }, [canAct, gameState, executeCreatureAction])
 
+    await new Promise(r => setTimeout(r, 800))
+
+    // Complete the turn (combat + end turn + opponent)
+    await completePlayerTurn(newState)
+  }, [canAct, gameState, resolveCardEffect, emit, completePlayerTurn])
+
+  // Skip playing a card and go straight to combat
+  const handleSkipCard = useCallback(async () => {
+    if (!canAct || !gameState || gameState.hasPlayedCard) return
+    await completePlayerTurn(gameState)
+  }, [canAct, gameState, completePlayerTurn])
+
+  // Simplified opponent turn: play one card (optional) -> combat -> end turn
   const runOpponentTurn = useCallback(async (state: GameState) => {
     setIsLoading(true)
 
     try {
-      // Check if AI has any playable cards
-      const hasPlayableCards = state.opponent.hand.some(c => c.cost <= state.opponent.mana)
-      const creaturesCanAct = state.opponent.field.filter(c => c.canAttack)
-
       let newState = state
 
-      // First, play cards if possible
-      if (hasPlayableCards) {
-        const response = await fetch('/api/ai-turn', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gameState: newState })
-        })
+      // AI decides whether to play a card
+      const response = await fetch('/api/ai-turn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameState: newState })
+      })
 
-        if (response.ok) {
-          const aiResponse: AITurnResponse = await response.json()
+      if (response.ok) {
+        const aiResponse: AITurnResponse = await response.json()
 
-          if (aiResponse.action === 'play' && aiResponse.cardIndex !== undefined) {
-            const card = newState.opponent.hand[aiResponse.cardIndex]
-            const result = playCard(newState, 'opponent', aiResponse.cardIndex)
-            if (result) {
-              // Play sound based on card type
-              if (result.card.type === 'spell') {
-                playSound('spellCast')
-                if (opponentFieldRef.current) {
-                  const rect = opponentFieldRef.current.getBoundingClientRect()
-                  emit('spell', rect.left + rect.width / 2, rect.top + rect.height / 2)
-                }
-              } else {
-                playSound('creatureSummon')
-                if (opponentFieldRef.current) {
-                  const rect = opponentFieldRef.current.getBoundingClientRect()
-                  emit('summon', rect.left + rect.width / 2, rect.top + rect.height / 2)
-                }
+        if (aiResponse.action === 'play' && aiResponse.cardIndex !== undefined) {
+          const card = newState.opponent.hand[aiResponse.cardIndex]
+          const result = playCard(newState, 'opponent', aiResponse.cardIndex)
+          if (result) {
+            // Play sound based on card type
+            if (result.card.type === 'spell') {
+              playSound('spellCast')
+              if (opponentFieldRef.current) {
+                const rect = opponentFieldRef.current.getBoundingClientRect()
+                emit('spell', rect.left + rect.width / 2, rect.top + rect.height / 2)
               }
-              newState = result.state
-              newState = addLogEntry(newState, 'opponent', `The opponent plays ${card.name}!`)
-              newState = await resolveCardEffect(newState, result.card, 'opponent')
-              setGameState(newState)
-              await new Promise(r => setTimeout(r, 1500))
-
-              // Recursively continue turn
-              if (newState.phase !== 'ended') {
-                await runOpponentTurn(newState)
-                return
+            } else {
+              playSound('creatureSummon')
+              if (opponentFieldRef.current) {
+                const rect = opponentFieldRef.current.getBoundingClientRect()
+                emit('summon', rect.left + rect.width / 2, rect.top + rect.height / 2)
               }
             }
+            newState = result.state
+            newState = addLogEntry(newState, 'opponent', `The opponent plays ${card.name}!`)
+            newState = await resolveCardEffect(newState, result.card, 'opponent')
+            setGameState(newState)
+
+            if (newState.phase === 'ended') {
+              setIsLoading(false)
+              return
+            }
+
+            await new Promise(r => setTimeout(r, 1000))
           }
         }
       }
 
-      // Then, let each creature act
-      for (const creature of creaturesCanAct) {
-        if (newState.phase === 'ended') break
-        // Check creature is still alive
-        if (!newState.opponent.field.some(c => c.instanceId === creature.instanceId)) continue
+      // Combat phase
+      setGameState({ ...newState, phase: 'combat' })
+      newState = await executeCombatPhase(newState, 'opponent')
+      setGameState(newState)
 
-        const currentCreature = newState.opponent.field.find(c => c.instanceId === creature.instanceId)
-        if (!currentCreature || !currentCreature.canAttack) continue
-
-        newState = await executeCreatureAction(newState, currentCreature, 'opponent')
-        setGameState(newState)
-        await new Promise(r => setTimeout(r, 1500))
+      if (newState.phase === 'ended') {
+        setIsLoading(false)
+        return
       }
+
+      await new Promise(r => setTimeout(r, 500))
 
       // End turn
-      if (newState.phase !== 'ended') {
-        playSound('turnStart')
-        newState = endTurn(newState)
-        newState = addLogEntry(newState, 'system', 'Your turn begins.')
-        setGameState(newState)
-      }
+      playSound('turnStart')
+      newState = endTurn(newState)
+      newState = addLogEntry(newState, 'system', 'Your turn begins.')
+      setGameState(newState)
       setIsLoading(false)
     } catch (error) {
       console.error('AI turn error:', error)
@@ -411,19 +391,7 @@ function BoardInner() {
       setGameState(addLogEntry(newState, 'system', 'The opponent ponders briefly, then ends their turn.'))
       setIsLoading(false)
     }
-  }, [resolveCardEffect, executeCreatureAction, emit])
-
-  const handleEndTurn = useCallback(async () => {
-    if (!canAct || !gameState) return
-
-    playSound('turnEnd')
-    let newState = endTurn(gameState)
-    newState = addLogEntry(newState, 'system', "Opponent's turn begins.")
-    setGameState(newState)
-
-    await new Promise(r => setTimeout(r, 500))
-    await runOpponentTurn(newState)
-  }, [canAct, gameState, runOpponentTurn])
+  }, [resolveCardEffect, executeCombatPhase, emit])
 
   const handleRestart = useCallback(() => {
     setGameState(createInitialGameState())
@@ -453,15 +421,14 @@ function BoardInner() {
             <span className={styles.icon}>❤️</span>
             {gameState.opponent.health}
           </div>
-          <div className={styles.mana}>
-            <span className={styles.icon}>💎</span>
-            {gameState.opponent.mana}/{gameState.opponent.maxMana}
+          <div className={styles.cardCount}>
+            <span className={styles.icon}>🃏</span>
+            {gameState.opponent.hand.length}
           </div>
         </div>
 
         <Hand
           cards={gameState.opponent.hand}
-          mana={gameState.opponent.mana}
           isOpponent
         />
 
@@ -470,7 +437,6 @@ function BoardInner() {
             <Field
               creatures={gameState.opponent.field}
               isOpponent
-              onCreatureClick={handleCreatureClick}
             />
           </div>
 
@@ -480,15 +446,13 @@ function BoardInner() {
             <Field
               creatures={gameState.player.field}
               isPlayerTurn={isPlayerTurn}
-              onCreatureClick={handleCreatureClick}
             />
           </div>
         </div>
 
         <Hand
           cards={gameState.player.hand}
-          mana={gameState.player.mana}
-          onPlayCard={handlePlayCard}
+          onPlayCard={!gameState.hasPlayedCard ? handlePlayCard : undefined}
         />
 
         {/* Player area */}
@@ -500,9 +464,9 @@ function BoardInner() {
             <span className={styles.icon}>❤️</span>
             {gameState.player.health}
           </div>
-          <div className={styles.mana}>
-            <span className={styles.icon}>💎</span>
-            {gameState.player.mana}/{gameState.player.maxMana}
+          <div className={styles.cardCount}>
+            <span className={styles.icon}>🃏</span>
+            {gameState.player.hand.length}
           </div>
         </div>
 
@@ -517,17 +481,17 @@ function BoardInner() {
               )}
             </div>
           ) : (
-            <span>{isPlayerTurn ? 'Your turn - click a creature to activate it!' : "Opponent's turn"}</span>
+            <span>{isPlayerTurn ? (gameState.hasPlayedCard ? 'Card played! Combat begins...' : 'Your turn - play a card or skip') : "Opponent's turn"}</span>
           )}
         </div>
 
         <div className={styles.controls}>
           <button
             className={styles.endTurnBtn}
-            onClick={handleEndTurn}
-            disabled={!canAct}
+            onClick={handleSkipCard}
+            disabled={!canAct || gameState.hasPlayedCard}
           >
-            End Turn
+            Skip Card
           </button>
           <button className={styles.restartBtn} onClick={handleRestart}>
             New Game

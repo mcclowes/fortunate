@@ -104,7 +104,6 @@ export default function Card({ card, playable, onField, canAttack, isOpponent, o
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className={styles.cost}>{card.cost}</div>
       <div className={styles.name}>{card.name}</div>
       {card.image && (
         <div className={styles.imageContainer}>
@@ -147,7 +146,6 @@ export default function Card({ card, playable, onField, canAttack, isOpponent, o
       {showPreview && (
         <div className={styles.previewOverlay} onClick={handlePreviewClick}>
           <div className={styles.previewCard}>
-            <div className={styles.previewCost}>{card.cost}</div>
             <div className={styles.previewName}>{card.name}</div>
             {card.image && (
               <div className={styles.previewImageContainer}>
