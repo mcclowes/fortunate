@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useRef, useCallback } from 'react'
 import { Card as CardType, Creature } from '@/lib/types'
 import styles from '@/styles/Card.module.scss'
 
@@ -17,6 +18,10 @@ function isCreatureInstance(card: CardType | Creature): card is Creature {
 }
 
 export default function Card({ card, playable, onField, canAttack, isOpponent, onClick }: CardProps) {
+  const [showPreview, setShowPreview] = useState(false)
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const hoverTimer = useRef<NodeJS.Timeout | null>(null)
+
   const classes = [
     styles.card,
     card.type === 'creature' ? styles.creature : styles.spell,
@@ -29,8 +34,53 @@ export default function Card({ card, playable, onField, canAttack, isOpponent, o
   const attack = isCreatureInstance(card) ? card.currentAttack : card.baseStats?.attack
   const health = isCreatureInstance(card) ? card.currentHealth : card.baseStats?.health
 
+  // Desktop hover handlers
+  const handleMouseEnter = useCallback(() => {
+    hoverTimer.current = setTimeout(() => {
+      setShowPreview(true)
+    }, 300)
+  }, [])
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current)
+      hoverTimer.current = null
+    }
+    setShowPreview(false)
+  }, [])
+
+  // Mobile long-press handlers
+  const handleTouchStart = useCallback(() => {
+    longPressTimer.current = setTimeout(() => {
+      setShowPreview(true)
+    }, 400)
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+    // Delay hiding to allow user to see the preview
+    if (showPreview) {
+      setTimeout(() => setShowPreview(false), 100)
+    }
+  }, [showPreview])
+
+  const handlePreviewClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowPreview(false)
+  }, [])
+
   return (
-    <div className={classes} onClick={onClick}>
+    <div
+      className={classes}
+      onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       <div className={styles.cost}>{card.cost}</div>
       <div className={styles.name}>{card.name}</div>
       {card.image && (
@@ -47,6 +97,30 @@ export default function Card({ card, playable, onField, canAttack, isOpponent, o
         </div>
       ) : (
         <div className={styles.spellBadge}>Spell</div>
+      )}
+
+      {showPreview && (
+        <div className={styles.previewOverlay} onClick={handlePreviewClick}>
+          <div className={styles.previewCard}>
+            <div className={styles.previewCost}>{card.cost}</div>
+            <div className={styles.previewName}>{card.name}</div>
+            {card.image && (
+              <div className={styles.previewImageContainer}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={card.image} alt={card.name} className={styles.previewImage} />
+              </div>
+            )}
+            <div className={styles.previewFlavor}>{card.flavor}</div>
+            {card.type === 'creature' && attack !== undefined && health !== undefined ? (
+              <div className={styles.previewStats}>
+                <div className={styles.previewAttack}>{attack}</div>
+                <div className={styles.previewHealth}>{health}</div>
+              </div>
+            ) : (
+              <div className={styles.previewSpellBadge}>Spell</div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
