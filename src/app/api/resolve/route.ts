@@ -7,10 +7,11 @@ const anthropic = new Anthropic()
 
 export async function POST(request: NextRequest) {
   try {
-    const { gameState, card, who } = await request.json() as {
+    const { gameState, card, who, creatureInstanceId } = await request.json() as {
       gameState: GameState
       card: Card
       who: 'player' | 'opponent'
+      creatureInstanceId?: string
     }
 
     const stream = await anthropic.messages.stream({
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: 'user',
-          content: createResolvePrompt(gameState, card, who)
+          content: createResolvePrompt(gameState, card, who, creatureInstanceId)
         }
       ],
       system: RESOLVE_SYSTEM_PROMPT

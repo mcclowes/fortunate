@@ -156,13 +156,13 @@ function BoardInner() {
     return result
   }, [])
 
-  const resolveCardEffect = useCallback(async (state: GameState, card: Card, who: 'player' | 'opponent') => {
+  const resolveCardEffect = useCallback(async (state: GameState, card: Card, who: 'player' | 'opponent', creatureInstanceId?: string) => {
     try {
       setStreamingText('')
       const response = await fetch('/api/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameState: state, card, who })
+        body: JSON.stringify({ gameState: state, card, who, creatureInstanceId })
       })
 
       if (!response.ok) throw new Error('Failed to resolve')
@@ -214,7 +214,12 @@ function BoardInner() {
     setIsLoading(true)
     setGameState({ ...result.state, phase: 'resolving' })
 
-    const newState = await resolveCardEffect(result.state, result.card, 'player')
+    // Get the instanceId of the newly summoned creature (if it's a creature)
+    const creatureInstanceId = result.card.type === 'creature'
+      ? result.state.player.field[result.state.player.field.length - 1]?.instanceId
+      : undefined
+
+    const newState = await resolveCardEffect(result.state, result.card, 'player', creatureInstanceId)
     setGameState({ ...newState, phase: 'playing' })
     setIsLoading(false)
   }, [canAct, gameState, resolveCardEffect, emit])
@@ -369,7 +374,13 @@ function BoardInner() {
               }
               newState = result.state
               newState = addLogEntry(newState, 'opponent', `The opponent plays ${card.name}!`)
-              newState = await resolveCardEffect(newState, result.card, 'opponent')
+
+              // Get the instanceId of the newly summoned creature (if it's a creature)
+              const creatureInstanceId = result.card.type === 'creature'
+                ? newState.opponent.field[newState.opponent.field.length - 1]?.instanceId
+                : undefined
+
+              newState = await resolveCardEffect(newState, result.card, 'opponent', creatureInstanceId)
               setGameState(newState)
               await new Promise(r => setTimeout(r, 1500))
 

@@ -43,26 +43,38 @@ StateChange types:
 - {"type": "add_shield", "target": "creature", "targetId": "id", "value": amount}
 - {"type": "summon", "target": "player|opponent", "card": {id,name,flavor,cost,type:"creature",baseStats:{attack,health}}}
 - {"type": "steal_creature", "target": "creature", "targetId": "creature-id"}
-- {"type": "transform", "target": "creature", "targetId": "id", "card": {creature-card}}
+- {"type": "transform", "target": "creature", "targetId": "id", "card": {creature-card}} OR {"type": "transform", "target": "creature", "targetId": "id", "sourceId": "creature-to-copy-id"}
 - {"type": "copy_creature", "target": "player|opponent", "targetId": "creature-to-copy"}
 - {"type": "bounce", "target": "creature", "targetId": "creature-id"} (returns to hand)
 
 Status effects: frozen (skip attack), poisoned (1 dmg/turn), taunt (must be attacked), stealth (untargetable), silenced (no abilities), doomed (dies end of turn)
 
+Special: For Mirror Mimic transform effects, use sourceId to specify which creature to copy (targetId is the creature transforming, sourceId is the creature being copied).
+
 Effect scale: 1-cost = 1-2 damage/+1 buff. 3-cost = 2-3 damage or status. 5-cost = 4-5 damage or multiple effects. Creatures already summoned - describe entry effects only.`
 
-export function createResolvePrompt(gameState: GameState, card: Card, who: 'player' | 'opponent'): string {
+export function createResolvePrompt(gameState: GameState, card: Card, who: 'player' | 'opponent', creatureInstanceId?: string): string {
   const caster = gameState[who]
   const enemy = gameState[who === 'player' ? 'opponent' : 'player']
   const enemyCreatures = enemy.field.map(formatCreature).join(', ') || 'none'
   const friendlyCreatures = caster.field.map(formatCreature).join(', ') || 'none'
   const battleHistory = formatBattleHistory(gameState.log)
 
+  let effectInfo = ''
+  if (card.effect?.type === 'transform_into_creature') {
+    const allCreatures = [...caster.field, ...enemy.field].filter(c => c.instanceId !== creatureInstanceId)
+    if (allCreatures.length > 0) {
+      effectInfo = `\nSPECIAL EFFECT: This creature transforms into a copy of another creature on play. Choose one to copy and use transform with targetId="${creatureInstanceId}" and sourceId=chosen creature's id.`
+    } else {
+      effectInfo = `\nNo creatures to copy - Mirror Mimic remains confused and unchanged.`
+    }
+  }
+
   return `${battleHistory}Turn ${gameState.turn} - ${who === 'player' ? 'Hero' : 'Opponent'} plays:
 ${card.name} (${card.type}, ${card.cost} mana): "${card.flavor}"
 Caster: ${caster.health}hp, ${caster.mana}/${caster.maxMana} mana, creatures: ${friendlyCreatures}
 Enemy: ${enemy.health}hp, creatures: ${enemyCreatures}
-${card.type === 'creature' ? 'Creature summoned - describe entry effect.' : 'Cast spell effect.'}`
+${card.type === 'creature' ? `Creature summoned (instanceId: ${creatureInstanceId}) - describe entry effect.` : 'Cast spell effect.'}${effectInfo}`
 }
 
 export const AI_TURN_SYSTEM_PROMPT = `AI opponent in card game. Pick ONE action. JSON only:

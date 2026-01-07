@@ -249,8 +249,13 @@ export function applyStateChanges(state: GameState, changes: StateChange[]): Gam
         break
 
       case 'transform':
-        if (change.targetId && change.card && change.card.type === 'creature') {
-          newState = transformCreature(newState, change.targetId, change.card)
+        if (change.targetId) {
+          // Support both card-based transform and sourceId-based transform (Mirror Mimic)
+          if (change.sourceId) {
+            newState = transformCreatureFromSource(newState, change.targetId, change.sourceId)
+          } else if (change.card && change.card.type === 'creature') {
+            newState = transformCreature(newState, change.targetId, change.card)
+          }
         }
         break
 
@@ -496,6 +501,37 @@ function transformCreature(state: GameState, instanceId: string, intoCard: Card)
   }
 }
 
+// Transform creature by copying another creature (for Mirror Mimic)
+function transformCreatureFromSource(state: GameState, targetId: string, sourceId: string): GameState {
+  // Find the source creature to copy from
+  const sourceCreature = [...state.player.field, ...state.opponent.field]
+    .find(c => c.instanceId === sourceId)
+
+  if (!sourceCreature) return state
+
+  const updateField = (field: Creature[]): Creature[] => {
+    return field.map(c => {
+      if (c.instanceId === targetId) {
+        // Transform into a copy of the source, keeping own instanceId and canAttack status
+        return {
+          ...sourceCreature,
+          instanceId: c.instanceId,
+          canAttack: c.canAttack,
+          currentHealth: sourceCreature.baseStats?.health || sourceCreature.currentHealth,
+          currentAttack: sourceCreature.baseStats?.attack || sourceCreature.currentAttack
+        }
+      }
+      return c
+    })
+  }
+
+  return {
+    ...state,
+    player: { ...state.player, field: updateField(state.player.field) },
+    opponent: { ...state.opponent, field: updateField(state.opponent.field) }
+  }
+}
+
 function copyCreature(state: GameState, instanceId: string, copyTo: 'player' | 'opponent'): GameState {
   // Find the creature to copy
   const allCreatures = [...state.player.field, ...state.opponent.field]
@@ -607,7 +643,7 @@ export function endTurn(state: GameState): GameState {
     return field
       .map(c => {
         const effects = c.statusEffects || []
-        let updated = { ...c }
+        const updated = { ...c }
 
         // Doomed creatures die at end of turn
         if (effects.includes('doomed')) {

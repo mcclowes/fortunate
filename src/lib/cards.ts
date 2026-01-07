@@ -85,7 +85,8 @@ export const allCards: Card[] = [
     cost: 3,
     type: 'creature',
     image: `${ICON_BASE}/lorc/spectre.svg`,
-    baseStats: { attack: 2, health: 2 }
+    baseStats: { attack: 2, health: 2 },
+    effect: { type: 'transform_into_creature' }
   },
   {
     id: 'cursed-accountant',

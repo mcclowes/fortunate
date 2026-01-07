@@ -32,6 +32,7 @@ type SoundType =
   | 'victory'
   | 'defeat'
   | 'draw'
+  | 'transform'
 
 // Create an oscillator-based sound
 function createTone(
@@ -187,6 +188,14 @@ export function playSound(sound: SoundType): void {
         createTone(300, 0.05, 'triangle', 0.15)
         createTone(350, 0.05, 'triangle', 0.12, 0.04)
         break
+
+      case 'transform':
+        // Morphing warble - wavering frequency shift
+        createTone(300, 0.15, 'sine', 0.2)
+        createTone(450, 0.15, 'sine', 0.2, 0.1)
+        createTone(350, 0.15, 'triangle', 0.18, 0.2)
+        createTone(500, 0.2, 'sine', 0.22, 0.3)
+        break
     }
   } catch (error) {
     // Silently fail if audio isn't available
@@ -214,6 +223,9 @@ export function playSoundForStateChange(changeType: string): void {
       break
     case 'summon':
       playSound('creatureSummon')
+      break
+    case 'transform':
+      playSound('transform')
       break
   }
 }
