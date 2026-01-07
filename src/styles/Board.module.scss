@@ -1,0 +1,225 @@
+.container {
+  display: flex;
+  min-height: 100vh;
+  padding: 20px;
+  gap: 20px;
+}
+
+.board {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 900px;
+}
+
+.sidebar {
+  width: 350px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.heroArea {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--bg-medium);
+  border-radius: 8px;
+
+  &.opponent {
+    background: linear-gradient(90deg, var(--bg-medium), rgba(233, 69, 96, 0.2));
+  }
+
+  &.player {
+    background: linear-gradient(90deg, var(--bg-medium), rgba(74, 158, 255, 0.2));
+  }
+}
+
+.heroInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.heroName {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.health {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--health);
+
+  .icon {
+    font-size: 20px;
+  }
+}
+
+.mana {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  color: var(--mana);
+
+  .icon {
+    font-size: 16px;
+  }
+}
+
+.battlefield {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.divider {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  margin: 8px 0;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+}
+
+.endTurnBtn {
+  padding: 12px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  transition: background 0.2s, transform 0.1s;
+
+  &:hover:not(:disabled) {
+    background: var(--accent-light);
+    transform: scale(1.05);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.restartBtn {
+  padding: 12px 24px;
+  font-size: 14px;
+  background: var(--bg-light);
+  color: var(--text);
+  border: 1px solid var(--text-dim);
+  border-radius: 8px;
+
+  &:hover {
+    background: var(--bg-medium);
+  }
+}
+
+.status {
+  text-align: center;
+  padding: 12px;
+  font-size: 16px;
+  color: var(--gold);
+  min-height: 44px;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--mana);
+  max-width: 600px;
+  margin: 0 auto;
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--mana);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    flex-shrink: 0;
+  }
+}
+
+.streamingText {
+  font-style: italic;
+  color: var(--text-dim);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 500px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.gameOver {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.gameOverContent {
+  background: var(--bg-medium);
+  padding: 48px 64px;
+  border-radius: 16px;
+  text-align: center;
+
+  h2 {
+    font-size: 36px;
+    margin-bottom: 16px;
+  }
+
+  &.win h2 {
+    color: var(--health);
+  }
+
+  &.lose h2 {
+    color: var(--accent);
+  }
+
+  p {
+    color: var(--text-dim);
+    margin-bottom: 24px;
+  }
+}
+
+.attackMode {
+  background: rgba(233, 69, 96, 0.2);
+  border: 2px dashed var(--accent);
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  button {
+    padding: 4px 12px;
+    background: var(--bg-light);
+    border: none;
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+  }
+}

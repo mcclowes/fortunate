@@ -1,0 +1,25 @@
+.field {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  min-height: 160px;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+.opponent {
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.player {
+  background: rgba(74, 158, 255, 0.1);
+}

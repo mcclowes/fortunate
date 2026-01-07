@@ -1,0 +1,41 @@
+.log {
+  background: var(--bg-medium);
+  border-radius: 8px;
+  padding: 16px;
+  height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.entry {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--bg-dark);
+
+  &.player {
+    border-left: 3px solid var(--mana);
+  }
+
+  &.opponent {
+    border-left: 3px solid var(--accent);
+  }
+
+  &.system {
+    border-left: 3px solid var(--gold);
+    font-style: italic;
+  }
+}
+
+.turn {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.narrative {
+  color: var(--text);
+}

@@ -1,0 +1,174 @@
+.card {
+  width: 120px;
+  height: 170px;
+  background: linear-gradient(145deg, var(--bg-light), var(--bg-medium));
+  border-radius: 8px;
+  border: 2px solid var(--bg-light);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  position: relative;
+
+  // Cards in hand that are playable
+  &.playable {
+    border-color: var(--gold);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+    cursor: pointer;
+
+    &:hover {
+      transform: translateY(-8px) scale(1.05);
+      box-shadow: 0 8px 25px rgba(251, 191, 36, 0.5);
+    }
+  }
+
+  // Cards in hand that are NOT playable (too expensive)
+  &:not(.playable):not(.onField) {
+    opacity: 0.7;
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  &.creature {
+    border-color: var(--accent);
+  }
+
+  &.spell {
+    border-color: var(--mana);
+  }
+
+  &.small {
+    width: 90px;
+    height: 130px;
+    font-size: 0.85em;
+
+    .stats {
+      font-size: 0.9em;
+    }
+  }
+
+  // Creatures on the field
+  &.onField {
+    width: 100px;
+    height: 140px;
+    opacity: 1;
+
+    // Exhausted creatures (can't act)
+    &:not(.canAttack) {
+      opacity: 0.6;
+      filter: saturate(0.5);
+    }
+  }
+
+  // Creatures that can be activated
+  &.canAttack {
+    border-color: var(--health);
+    animation: pulse 1.5s infinite;
+    cursor: pointer;
+
+    &:hover {
+      transform: translateY(-6px) scale(1.05);
+      box-shadow: 0 0 20px rgba(74, 222, 128, 0.6);
+      animation: none;
+    }
+  }
+
+  // Opponent's cards - never clickable
+  &.opponent {
+    cursor: default;
+
+    &:not(.onField) {
+      // Hide opponent's hand cards
+      background: linear-gradient(145deg, var(--bg-medium), var(--bg-dark));
+    }
+
+    &:hover {
+      transform: none;
+    }
+
+    &.onField:hover {
+      // Allow slight hover on opponent creatures to show they exist
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(74, 222, 128, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(74, 222, 128, 0.6); }
+}
+
+.cost {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 28px;
+  height: 28px;
+  background: var(--mana);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  border: 2px solid var(--bg-dark);
+}
+
+.name {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 4px;
+  margin-top: 8px;
+  line-height: 1.2;
+}
+
+.flavor {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-align: center;
+  flex: 1;
+  overflow: hidden;
+  line-height: 1.3;
+}
+
+.stats {
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.attack, .health {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.attack {
+  background: var(--attack);
+}
+
+.health {
+  background: var(--health);
+  color: var(--bg-dark);
+}
+
+.spellBadge {
+  margin-top: auto;
+  text-align: center;
+  font-size: 10px;
+  color: var(--mana);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
