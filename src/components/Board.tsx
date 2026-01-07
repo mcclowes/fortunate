@@ -101,6 +101,19 @@ function BoardInner() {
       buff: 'buff',
       summon: 'summon',
       draw: 'spell',
+      // New effects mapped to existing particle types
+      debuff: 'damage',
+      discard: 'damage',
+      mill: 'damage',
+      gain_mana: 'spell',
+      steal_mana: 'spell',
+      apply_status: 'spell',
+      remove_status: 'heal',
+      add_shield: 'buff',
+      steal_creature: 'spell',
+      transform: 'summon',
+      copy_creature: 'summon',
+      bounce: 'spell',
     }
 
     const particleType = particleMap[change.type]
