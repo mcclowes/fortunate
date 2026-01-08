@@ -59,12 +59,16 @@ export default function Card({ card, playable, onField, canAttack, isOpponent, i
   const health = isCreatureInstance(card) ? card.currentHealth : card.baseStats?.health
   const shield = isCreatureInstance(card) ? card.shield : undefined
 
-  // Desktop hover handlers
+  // Don't show preview for interactive cards (targets, attackers)
+  const isInteractive = isValidTarget || canAttack || playable
+
+  // Desktop hover handlers - longer delay and skip for interactive cards
   const handleMouseEnter = useCallback(() => {
+    if (isInteractive) return
     hoverTimer.current = setTimeout(() => {
       setShowPreview(true)
-    }, 300)
-  }, [])
+    }, 800)
+  }, [isInteractive])
 
   const handleMouseLeave = useCallback(() => {
     if (hoverTimer.current) {
@@ -74,12 +78,13 @@ export default function Card({ card, playable, onField, canAttack, isOpponent, i
     setShowPreview(false)
   }, [])
 
-  // Mobile long-press handlers
+  // Mobile long-press handlers - skip for interactive cards
   const handleTouchStart = useCallback(() => {
+    if (isInteractive) return
     longPressTimer.current = setTimeout(() => {
       setShowPreview(true)
-    }, 400)
-  }, [])
+    }, 600)
+  }, [isInteractive])
 
   const handleTouchEnd = useCallback(() => {
     if (longPressTimer.current) {
