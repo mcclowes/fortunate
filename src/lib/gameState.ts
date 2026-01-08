@@ -390,8 +390,11 @@ function stealCreature(state: GameState, instanceId: string): GameState {
   const opponentCreatureIndex = state.opponent.field.findIndex(c => c.instanceId === instanceId)
 
   if (playerCreatureIndex !== -1) {
+    const originalCreature = state.player.field[playerCreatureIndex]
+    // Don't steal dead creatures
+    if (originalCreature.currentHealth <= 0) return state
     // Creature belongs to player, move to opponent
-    const creature = { ...state.player.field[playerCreatureIndex], originalOwner: 'player' as const, canAttack: false }
+    const creature = { ...originalCreature, originalOwner: 'player' as const, canAttack: false }
     return {
       ...state,
       player: {
@@ -404,8 +407,11 @@ function stealCreature(state: GameState, instanceId: string): GameState {
       }
     }
   } else if (opponentCreatureIndex !== -1) {
+    const originalCreature = state.opponent.field[opponentCreatureIndex]
+    // Don't steal dead creatures
+    if (originalCreature.currentHealth <= 0) return state
     // Creature belongs to opponent, move to player
-    const creature = { ...state.opponent.field[opponentCreatureIndex], originalOwner: 'opponent' as const, canAttack: false }
+    const creature = { ...originalCreature, originalOwner: 'opponent' as const, canAttack: false }
     return {
       ...state,
       player: {
@@ -452,7 +458,8 @@ function copyCreature(state: GameState, instanceId: string, copyTo: 'player' | '
   const allCreatures = [...state.player.field, ...state.opponent.field]
   const original = allCreatures.find(c => c.instanceId === instanceId)
 
-  if (!original) return state
+  // Don't copy if creature doesn't exist or has 0 health
+  if (!original || original.currentHealth <= 0) return state
 
   const copy: Creature = {
     ...original,
@@ -537,14 +544,35 @@ function bounceCreature(state: GameState, instanceId: string): GameState {
   return state
 }
 
+// Remove any creatures with 0 or negative health from the field
+function removeDeadCreatures(state: GameState): GameState {
+  const playerField = state.player.field.filter(c => c.currentHealth > 0)
+  const opponentField = state.opponent.field.filter(c => c.currentHealth > 0)
+
+  // Only create new state if something changed
+  if (playerField.length === state.player.field.length &&
+      opponentField.length === state.opponent.field.length) {
+    return state
+  }
+
+  return {
+    ...state,
+    player: { ...state.player, field: playerField },
+    opponent: { ...state.opponent, field: opponentField }
+  }
+}
+
 function checkWinCondition(state: GameState): GameState {
-  if (state.player.health <= 0) {
-    return { ...state, phase: 'ended', winner: 'opponent' }
+  // First remove any dead creatures
+  const cleanedState = removeDeadCreatures(state)
+
+  if (cleanedState.player.health <= 0) {
+    return { ...cleanedState, phase: 'ended', winner: 'opponent' }
   }
-  if (state.opponent.health <= 0) {
-    return { ...state, phase: 'ended', winner: 'player' }
+  if (cleanedState.opponent.health <= 0) {
+    return { ...cleanedState, phase: 'ended', winner: 'player' }
   }
-  return state
+  return cleanedState
 }
 
 export function endTurn(state: GameState): GameState {
