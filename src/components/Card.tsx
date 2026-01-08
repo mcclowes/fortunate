@@ -10,6 +10,7 @@ type CardProps = {
   onField?: boolean
   canAttack?: boolean
   isOpponent?: boolean
+  isValidTarget?: boolean
   onClick?: () => void
 }
 
@@ -27,7 +28,7 @@ const statusIcons: Record<StatusEffect, string> = {
   doomed: '💀'
 }
 
-export default function Card({ card, playable, onField, canAttack, isOpponent, onClick }: CardProps) {
+export default function Card({ card, playable, onField, canAttack, isOpponent, isValidTarget, onClick }: CardProps) {
   const [showPreview, setShowPreview] = useState(false)
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const hoverTimer = useRef<NodeJS.Timeout | null>(null)
@@ -44,6 +45,7 @@ export default function Card({ card, playable, onField, canAttack, isOpponent, o
     onField && styles.onField,
     canAttack && styles.canAttack,
     isOpponent && styles.opponent,
+    isValidTarget && styles.validTarget,
     isCreature && card.statusEffects?.includes('frozen') && styles.frozen,
     isCreature && card.statusEffects?.includes('poisoned') && styles.poisoned,
     isCreature && card.statusEffects?.includes('taunt') && styles.taunt,

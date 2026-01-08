@@ -9,18 +9,23 @@ type FieldProps = {
   isOpponent?: boolean
   isPlayerTurn?: boolean
   onCreatureClick?: (instanceId: string) => void
+  isTargeting?: boolean
+  validTargetIds?: string[]
 }
 
 export default function Field({
   creatures,
   isOpponent,
   isPlayerTurn,
-  onCreatureClick
+  onCreatureClick,
+  isTargeting,
+  validTargetIds
 }: FieldProps) {
   const classes = [
     styles.field,
-    isOpponent ? styles.opponent : styles.player
-  ].join(' ')
+    isOpponent ? styles.opponent : styles.player,
+    isTargeting ? styles.targeting : ''
+  ].filter(Boolean).join(' ')
 
   return (
     <div className={classes}>
@@ -29,14 +34,18 @@ export default function Field({
       ) : (
         creatures.map((creature) => {
           const canAct = !isOpponent && isPlayerTurn && creature.canAttack
+          const isValidTarget = isTargeting && validTargetIds?.includes(creature.instanceId)
+          const isClickable = isValidTarget || canAct
+
           return (
             <Card
               key={creature.instanceId}
               card={creature}
               onField
-              canAttack={canAct}
+              canAttack={canAct && !isTargeting}
               isOpponent={isOpponent}
-              onClick={canAct ? () => onCreatureClick?.(creature.instanceId) : undefined}
+              isValidTarget={isValidTarget}
+              onClick={isClickable ? () => onCreatureClick?.(creature.instanceId) : undefined}
             />
           )
         })

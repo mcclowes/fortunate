@@ -77,7 +77,21 @@
     }
   }
 
-  // Opponent's cards - never clickable
+  // Valid spell target
+  &.validTarget {
+    border-color: var(--gold);
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.6);
+    animation: targetPulse 1s infinite;
+    cursor: pointer;
+
+    &:hover {
+      transform: translateY(-4px) scale(1.05);
+      box-shadow: 0 0 25px rgba(251, 191, 36, 0.8);
+      animation: none;
+    }
+  }
+
+  // Opponent's cards - never clickable unless valid target
   &.opponent {
     cursor: default;
 
@@ -86,14 +100,19 @@
       background: linear-gradient(145deg, var(--bg-medium), var(--bg-dark));
     }
 
-    &:hover {
+    &:hover:not(.validTarget) {
       transform: none;
     }
 
-    &.onField:hover {
+    &.onField:hover:not(.validTarget) {
       // Allow slight hover on opponent creatures to show they exist
       transform: translateY(-2px);
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    // Valid targets on opponent side should be clickable
+    &.validTarget {
+      cursor: pointer;
     }
   }
 }
@@ -101,6 +120,11 @@
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 5px rgba(74, 222, 128, 0.3); }
   50% { box-shadow: 0 0 15px rgba(74, 222, 128, 0.6); }
+}
+
+@keyframes targetPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(251, 191, 36, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.7); }
 }
 
 .cost {
