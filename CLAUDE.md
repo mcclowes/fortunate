@@ -39,19 +39,27 @@ src/
 │   ├── page.tsx            # Entry point (renders Board)
 │   └── api/
 │       ├── ai-turn/        # AI decision-making endpoint
-│       ├── resolve/        # Card effect resolution endpoint
-│       └── creature-action/# Creature action endpoint
+│       ├── combat-phase/   # Combat phase resolution endpoint
+│       ├── creature-action/# Creature action endpoint
+│       ├── narrate/        # ElevenLabs voice narration endpoint
+│       └── resolve/        # Card effect resolution endpoint
 ├── components/
-│   ├── Board.tsx           # Main game container (~388 lines)
-│   ├── Hand.tsx            # Player hand display
-│   ├── Field.tsx           # Creature field display
+│   ├── Board.tsx           # Main game container (~663 lines)
 │   ├── Card.tsx            # Card component
-│   └── GameLog.tsx         # Game event log sidebar
+│   ├── Field.tsx           # Creature field display
+│   ├── GameLog.tsx         # Game event log sidebar
+│   ├── Hand.tsx            # Player hand display
+│   ├── NarrationToggle.tsx # Voice narration toggle control
+│   └── ParticleEffect.tsx  # Visual particle effects
+├── hooks/
+│   └── useNarration.ts     # Voice narration hook
 ├── lib/
-│   ├── types.ts            # TypeScript type definitions
-│   ├── gameState.ts        # Game state management (~306 lines)
-│   ├── cards.ts            # Card definitions (18 cards)
-│   └── prompts.ts          # Claude prompt templates
+│   ├── cards.ts            # Card definitions (63 cards + 12 tokens)
+│   ├── gameState.ts        # Game state management (~805 lines)
+│   ├── narration.ts        # Narration utility functions
+│   ├── prompts.ts          # Claude prompt templates
+│   ├── sounds.ts           # Sound effect utilities
+│   └── types.ts            # TypeScript type definitions
 └── styles/
     └── *.module.scss       # Component-scoped styles
 ```
@@ -60,11 +68,13 @@ src/
 
 | File | Purpose |
 |------|---------|
-| `src/lib/types.ts` | All TypeScript interfaces (Card, Creature, GameState, StateChange) |
+| `src/lib/types.ts` | All TypeScript interfaces (Card, Creature, GameState, StateChange, StatusEffect) |
 | `src/lib/gameState.ts` | Pure functions for immutable state management |
-| `src/lib/cards.ts` | Card pool definitions and deck creation |
+| `src/lib/cards.ts` | Card pool definitions, tokens, and deck creation |
 | `src/lib/prompts.ts` | Claude prompt engineering templates |
+| `src/lib/narration.ts` | ElevenLabs voice narration integration |
 | `src/components/Board.tsx` | Main game logic and UI orchestration |
+| `src/hooks/useNarration.ts` | React hook for narration state and playback |
 | `src/app/api/*/route.ts` | Server-side Claude API integration |
 
 ## Code Conventions
@@ -102,36 +112,81 @@ state.player.hand.push(card) // Mutation!
 ## Game Architecture
 
 ### Game Flow
-1. `createInitialGameState()` sets up players (30 health, 1 mana, 4 cards)
-2. Player turn: play cards, activate creatures, or end turn
+1. `createInitialGameState()` sets up players (30 health, 4 starting cards)
+2. Player turn: play one card per turn, then creatures attack
 3. Card effects resolved via `/api/resolve` with Claude narration
-4. Creature actions via `/api/creature-action` with personality
+4. Combat phase via `/api/combat-phase` for creature attacks
 5. AI opponent turn via `/api/ai-turn` for decisions
-6. `endTurn()` transitions turns, increments mana, enables attacks
+6. `endTurn()` transitions turns, draws a card, enables attacks
 7. `checkWinCondition()` ends game when health reaches 0
+
+Note: The game uses a "one card per turn" mechanic (`hasPlayedCard` flag) rather than a mana cost system.
 
 ### State Change Types
 ```typescript
-type StateChange =
-  | { type: 'damage'; target: 'player' | 'opponent'; amount: number }
-  | { type: 'heal'; target: 'player' | 'opponent'; amount: number }
-  | { type: 'damage_creature'; who: 'player' | 'opponent'; creatureIndex: number; amount: number }
-  | { type: 'buff_creature'; who: 'player' | 'opponent'; creatureIndex: number; attack?: number; health?: number }
-  | { type: 'destroy_creature'; who: 'player' | 'opponent'; creatureIndex: number }
-  | { type: 'summon'; who: 'player' | 'opponent'; card: Card }
-  | { type: 'draw'; who: 'player' | 'opponent'; count: number }
+type StateChange = {
+  type:
+    // Basic effects
+    | 'damage'           // Deal damage to target
+    | 'heal'             // Restore health to target
+    | 'destroy'          // Instantly destroy creature
+    | 'buff'             // Increase creature stats
+    | 'debuff'           // Reduce creature stats
+    | 'draw'             // Draw cards
+    // Summoning
+    | 'summon'           // Summon a token creature
+    | 'discard'          // Discard cards from hand
+    // Status effects
+    | 'apply_status'     // Apply a status effect (frozen, poisoned, taunt, stealth, silenced, doomed)
+    | 'remove_status'    // Remove a status effect
+    // Defense
+    | 'add_shield'       // Add shield to creature
+    // Mill
+    | 'mill'             // Remove cards from top of deck
+    // Control
+    | 'steal_creature'   // Take control of enemy creature
+    | 'transform'        // Change creature into another
+    | 'copy_creature'    // Create copy of a creature
+    | 'bounce'           // Return creature to owner's hand
+  target: 'player' | 'opponent' | 'creature'
+  targetId?: string      // instanceId if targeting a creature
+  value?: number
+  attack?: number        // For buff/debuff
+  health?: number        // For buff/debuff
+  card?: Card            // For summon/transform/copy
+  status?: StatusEffect  // For status effects
+}
 ```
 
 ### Card Types
 - **Creatures**: Have attack/health stats, persist on field, can attack once per turn
-- **Spells**: One-time effects, resolved immediately via Claude
+- **Spells**: One-time effects with optional targeting, resolved via Claude
+- **Tokens**: Generated by effects (not in deck), marked with `isToken: true`
+
+### Targeting Types
+Spells can specify a `targetType`:
+- `none` - No target needed (general board effect)
+- `enemy_creature` - Must target enemy creature
+- `friendly_creature` - Must target friendly creature
+- `any_creature` - Can target any creature
+- `any_hero` / `enemy_hero` - Hero targeting
+
+### Status Effects
+Creatures can have status effects:
+- `frozen` - Cannot attack next turn
+- `poisoned` - Takes 1 damage at start of each turn
+- `taunt` - Must be attacked before hero
+- `stealth` - Cannot be targeted until it attacks
+- `silenced` - Abilities disabled
+- `doomed` - Destroyed at end of turn
 
 ## Claude API Integration
 
-### Three AI Roles
+### Four AI Roles
 1. **Card Resolution** (`/api/resolve`) - Narrates effects, returns StateChange[]
-2. **AI Turn Decisions** (`/api/ai-turn`) - Chooses card to play or end turn
-3. **Creature Actions** (`/api/creature-action`) - Determines attack target or special ability
+2. **AI Turn Decisions** (`/api/ai-turn`) - Chooses card to play or pass
+3. **Combat Phase** (`/api/combat-phase`) - Coordinates all creature attacks in a single phase
+4. **Creature Actions** (`/api/creature-action`) - Individual creature attack decisions
 
 ### Prompt Structure
 - System prompts define behavior rules and JSON response format
@@ -152,13 +207,16 @@ const parseSSEStream = async (response: Response, onText: (text: string) => void
 ### CSS Variables (in globals.scss)
 ```scss
 --bg-dark: #1a1a2e
---bg-darker: #0f0f1a
+--bg-medium: #16213e
+--bg-light: #0f3460
 --accent: #e94560
---card-bg: #16213e
+--accent-light: #ff6b6b
 --text: #eee
---mana: #4ea8de
---health: #e63946
---attack: #f4a261
+--text-dim: #aaa
+--mana: #4a9eff
+--health: #4ade80
+--attack: #f97316
+--gold: #fbbf24
 ```
 
 ### Component States
@@ -171,8 +229,10 @@ const parseSSEStream = async (response: Response, onText: (text: string) => void
 
 ### When Adding New Cards
 1. Add card definition to `allCards[]` in `cards.ts`
-2. Include: name, flavor, cost, type, and stats (if creature)
-3. Spell effects are resolved dynamically by Claude
+2. Include: id, name, flavor, type, image URL, and baseStats (if creature)
+3. For spells, specify `targetType` to define targeting requirements
+4. Spell effects are resolved dynamically by Claude
+5. For token creatures, add to `tokenCreatures[]` with `isToken: true`
 
 ### When Modifying Game Logic
 1. Keep functions pure in `gameState.ts`
@@ -188,16 +248,26 @@ const parseSSEStream = async (response: Response, onText: (text: string) => void
 
 ## Common Tasks
 
-### Adding a New Card Type
+### Adding a New Card
 ```typescript
-// In cards.ts
-const newCard: Card = {
-  name: "Card Name",
-  flavor: "Flavor text here",
-  cost: 3,
-  type: 'creature', // or 'spell'
-  attack: 2,        // creatures only
-  health: 3,        // creatures only
+// In cards.ts - Creature example
+const newCreature: Card = {
+  id: 'unique-creature-id',
+  name: 'Card Name',
+  flavor: 'Flavor text here',
+  type: 'creature',
+  image: `${ICON_BASE}/author/icon-name.svg`,
+  baseStats: { attack: 2, health: 3 }
+}
+
+// Spell example with targeting
+const newSpell: Card = {
+  id: 'unique-spell-id',
+  name: 'Spell Name',
+  flavor: 'Spell flavor text',
+  type: 'spell',
+  image: `${ICON_BASE}/author/icon-name.svg`,
+  targetType: 'enemy_creature'  // or 'none', 'any_creature', etc.
 }
 ```
 
@@ -227,7 +297,7 @@ Recommended additions: Jest, React Testing Library, Playwright
 
 ### Common Issues
 - **API errors**: Check ANTHROPIC_API_KEY is set correctly
-- **Cards not playing**: Verify mana cost doesn't exceed current mana
+- **Cards not playing**: Only one card can be played per turn (check `hasPlayedCard` flag)
 - **Creatures can't attack**: They cannot attack the turn they're summoned
 - **JSON parse errors**: Check Claude response format in API routes
 - **Narration not working**: Ensure ELEVENLABS_API_KEY is set and the toggle is enabled
