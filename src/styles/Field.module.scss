@@ -24,6 +24,11 @@
   background: rgba(74, 158, 255, 0.1);
 }
 
+.targeting {
+  background: rgba(251, 191, 36, 0.05);
+  border: 1px dashed rgba(251, 191, 36, 0.3);
+}
+
 // Mobile responsive styles
 @media (max-width: 768px) {
   .field {

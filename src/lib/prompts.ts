@@ -1,4 +1,4 @@
-import { GameState, Card, Creature, GameEvent } from './types'
+import { GameState, Card, Creature, GameEvent, SpellTarget } from './types'
 
 // Format recent battle history for narrative continuity
 function formatBattleHistory(log: GameEvent[], maxEvents: number = 6): string {
@@ -49,17 +49,34 @@ Status effects: frozen (skip attack), poisoned (1 dmg/turn), taunt (must be atta
 
 Effect scale: Small effects = 1-2 damage/+1 buff. Medium effects = 2-3 damage or status. Big effects = 4-5 damage or multiple effects. Creatures already summoned - describe entry effects only.`
 
-export function createResolvePrompt(gameState: GameState, card: Card, who: 'player' | 'opponent'): string {
+export function createResolvePrompt(
+  gameState: GameState,
+  card: Card,
+  who: 'player' | 'opponent',
+  target?: SpellTarget
+): string {
   const caster = gameState[who]
   const enemy = gameState[who === 'player' ? 'opponent' : 'player']
   const enemyCreatures = enemy.field.map(formatCreature).join(', ') || 'none'
   const friendlyCreatures = caster.field.map(formatCreature).join(', ') || 'none'
   const battleHistory = formatBattleHistory(gameState.log)
 
+  // Build target info string if a target was specified
+  let targetInfo = ''
+  if (target && target.type === 'creature' && target.creatureId) {
+    const targetField = target.who === 'player' ? gameState.player.field : gameState.opponent.field
+    const targetCreature = targetField.find(c => c.instanceId === target.creatureId)
+    if (targetCreature) {
+      const isEnemyTarget = (who === 'player' && target.who === 'opponent') ||
+                           (who === 'opponent' && target.who === 'player')
+      targetInfo = `\nTARGET: ${targetCreature.name}[${targetCreature.instanceId}] (${isEnemyTarget ? 'enemy' : 'friendly'} creature) - The spell MUST affect this target!`
+    }
+  }
+
   return `${battleHistory}Turn ${gameState.turn} - ${who === 'player' ? 'Hero' : 'Opponent'} plays:
 ${card.name} (${card.type}): "${card.flavor}"
 Caster: ${caster.health}hp, creatures: ${friendlyCreatures}
-Enemy: ${enemy.health}hp, creatures: ${enemyCreatures}
+Enemy: ${enemy.health}hp, creatures: ${enemyCreatures}${targetInfo}
 ${card.type === 'creature' ? 'Creature summoned - describe entry effect.' : 'Cast spell effect.'}`
 }
 

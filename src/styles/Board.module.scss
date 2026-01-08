@@ -127,6 +127,34 @@
   }
 }
 
+.cancelBtn {
+  padding: 12px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--bg-light);
+  color: var(--gold);
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  transition: background 0.2s, transform 0.1s;
+
+  &:hover {
+    background: rgba(251, 191, 36, 0.1);
+    transform: scale(1.05);
+  }
+}
+
+.cardCount {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--text-dim);
+
+  .icon {
+    font-size: 14px;
+  }
+}
+
 .status {
   text-align: center;
   padding: 12px;

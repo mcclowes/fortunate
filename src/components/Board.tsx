@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { GameState, Card, ResolveResponse, AITurnResponse, CombatPhaseResponse, StateChange } from '@/lib/types'
+import { GameState, Card, ResolveResponse, AITurnResponse, CombatPhaseResponse, StateChange, SpellTarget, TargetType } from '@/lib/types'
 import {
   createInitialGameState,
   playCard,
@@ -30,6 +30,10 @@ function BoardInner() {
   const [isLoading, setIsLoading] = useState(false)
   const [streamingText, setStreamingText] = useState<string>('')
   const { emit } = useParticles()
+
+  // Spell targeting state
+  const [targetingSpell, setTargetingSpell] = useState<Card | null>(null)
+  const [targetingCardIndex, setTargetingCardIndex] = useState<number | null>(null)
 
   // Refs for particle effect positioning
   const playerFieldRef = useRef<HTMLDivElement>(null)
@@ -156,13 +160,18 @@ function BoardInner() {
     return result
   }, [])
 
-  const resolveCardEffect = useCallback(async (state: GameState, card: Card, who: 'player' | 'opponent') => {
+  const resolveCardEffect = useCallback(async (
+    state: GameState,
+    card: Card,
+    who: 'player' | 'opponent',
+    target?: SpellTarget
+  ) => {
     try {
       setStreamingText('')
       const response = await fetch('/api/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameState: state, card, who })
+        body: JSON.stringify({ gameState: state, card, who, target })
       })
 
       if (!response.ok) throw new Error('Failed to resolve')
@@ -272,8 +281,106 @@ function BoardInner() {
     await runOpponentTurn(newState)
   }, [executeCombatPhase])
 
+  // Check if a spell needs targeting and has valid targets
+  const getValidTargets = useCallback((card: Card, state: GameState, who: 'player' | 'opponent') => {
+    const targetType = card.targetType || 'none'
+    if (targetType === 'none' || card.type !== 'spell') return null
+
+    const enemy = who === 'player' ? state.opponent : state.player
+    const friendly = who === 'player' ? state.player : state.opponent
+
+    // Filter out stealthed creatures from enemy targets
+    const targetableEnemyCreatures = enemy.field.filter(
+      c => !c.statusEffects?.includes('stealth')
+    )
+
+    let validCreatures: typeof enemy.field = []
+
+    switch (targetType) {
+      case 'enemy_creature':
+        validCreatures = targetableEnemyCreatures
+        break
+      case 'friendly_creature':
+        validCreatures = friendly.field
+        break
+      case 'any_creature':
+        validCreatures = [...targetableEnemyCreatures, ...friendly.field]
+        break
+      default:
+        return null
+    }
+
+    return validCreatures.length > 0 ? validCreatures : null
+  }, [])
+
+  // Cancel targeting mode
+  const handleCancelTargeting = useCallback(() => {
+    setTargetingSpell(null)
+    setTargetingCardIndex(null)
+  }, [])
+
+  // Handle target selection for a spell
+  const handleTargetSelected = useCallback(async (creatureId: string) => {
+    if (!gameState || targetingCardIndex === null || !targetingSpell) return
+
+    const result = playCard(gameState, 'player', targetingCardIndex)
+    if (!result) {
+      handleCancelTargeting()
+      return
+    }
+
+    // Determine which side the creature is on
+    const isEnemyCreature = gameState.opponent.field.some(c => c.instanceId === creatureId)
+    const target: SpellTarget = {
+      type: 'creature',
+      creatureId,
+      who: isEnemyCreature ? 'opponent' : 'player'
+    }
+
+    // Clear targeting state
+    handleCancelTargeting()
+
+    // Play spell cast sound and particles
+    playSound('spellCast')
+    if (playerFieldRef.current) {
+      const rect = playerFieldRef.current.getBoundingClientRect()
+      emit('spell', rect.left + rect.width / 2, rect.top + rect.height / 2)
+    }
+
+    setIsLoading(true)
+    setGameState({ ...result.state, phase: 'resolving' })
+
+    // Resolve with target
+    let newState = await resolveCardEffect(result.state, result.card, 'player', target)
+    setGameState(newState)
+
+    if (newState.phase === 'ended') {
+      setIsLoading(false)
+      return
+    }
+
+    await new Promise(r => setTimeout(r, 800))
+    await completePlayerTurn(newState)
+  }, [gameState, targetingCardIndex, targetingSpell, resolveCardEffect, emit, completePlayerTurn, handleCancelTargeting])
+
   const handlePlayCard = useCallback(async (cardIndex: number) => {
     if (!canAct || !gameState || gameState.hasPlayedCard) return
+
+    const card = gameState.player.hand[cardIndex]
+    if (!card) return
+
+    // Check if this spell needs targeting
+    if (card.type === 'spell' && card.targetType && card.targetType !== 'none') {
+      const validTargets = getValidTargets(card, gameState, 'player')
+      if (validTargets && validTargets.length > 0) {
+        // Enter targeting mode
+        setTargetingSpell(card)
+        setTargetingCardIndex(cardIndex)
+        return
+      }
+      // No valid targets - spell fizzles or cast without target
+      // Fall through to cast without target
+    }
 
     const result = playCard(gameState, 'player', cardIndex)
     if (!result) return
@@ -309,7 +416,7 @@ function BoardInner() {
 
     // Complete the turn (combat + end turn + opponent)
     await completePlayerTurn(newState)
-  }, [canAct, gameState, resolveCardEffect, emit, completePlayerTurn])
+  }, [canAct, gameState, resolveCardEffect, emit, completePlayerTurn, getValidTargets])
 
   // Skip playing a card and go straight to combat
   const handleSkipCard = useCallback(async () => {
@@ -437,6 +544,9 @@ function BoardInner() {
             <Field
               creatures={gameState.opponent.field}
               isOpponent
+              isTargeting={!!targetingSpell}
+              validTargetIds={targetingSpell ? getValidTargets(targetingSpell, gameState, 'player')?.map(c => c.instanceId) : undefined}
+              onCreatureClick={targetingSpell ? handleTargetSelected : undefined}
             />
           </div>
 
@@ -446,13 +556,16 @@ function BoardInner() {
             <Field
               creatures={gameState.player.field}
               isPlayerTurn={isPlayerTurn}
+              isTargeting={!!targetingSpell}
+              validTargetIds={targetingSpell ? getValidTargets(targetingSpell, gameState, 'player')?.map(c => c.instanceId) : undefined}
+              onCreatureClick={targetingSpell ? handleTargetSelected : undefined}
             />
           </div>
         </div>
 
         <Hand
           cards={gameState.player.hand}
-          onPlayCard={!gameState.hasPlayedCard ? handlePlayCard : undefined}
+          onPlayCard={!gameState.hasPlayedCard && !targetingSpell ? handlePlayCard : undefined}
         />
 
         {/* Player area */}
@@ -480,19 +593,30 @@ function BoardInner() {
                 <span>The fates deliberate...</span>
               )}
             </div>
+          ) : targetingSpell ? (
+            <span>Select a target for {targetingSpell.name}</span>
           ) : (
             <span>{isPlayerTurn ? (gameState.hasPlayedCard ? 'Card played! Combat begins...' : 'Your turn - play a card or skip') : "Opponent's turn"}</span>
           )}
         </div>
 
         <div className={styles.controls}>
-          <button
-            className={styles.endTurnBtn}
-            onClick={handleSkipCard}
-            disabled={!canAct || gameState.hasPlayedCard}
-          >
-            Skip Card
-          </button>
+          {targetingSpell ? (
+            <button
+              className={styles.cancelBtn}
+              onClick={handleCancelTargeting}
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              className={styles.endTurnBtn}
+              onClick={handleSkipCard}
+              disabled={!canAct || gameState.hasPlayedCard}
+            >
+              Skip Card
+            </button>
+          )}
           <button className={styles.restartBtn} onClick={handleRestart}>
             New Game
           </button>

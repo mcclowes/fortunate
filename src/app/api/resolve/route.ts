@@ -1,16 +1,17 @@
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { GameState, Card, ResolveResponse } from '@/lib/types'
+import { GameState, Card, ResolveResponse, SpellTarget } from '@/lib/types'
 import { RESOLVE_SYSTEM_PROMPT, createResolvePrompt } from '@/lib/prompts'
 
 const anthropic = new Anthropic()
 
 export async function POST(request: NextRequest) {
   try {
-    const { gameState, card, who } = await request.json() as {
+    const { gameState, card, who, target } = await request.json() as {
       gameState: GameState
       card: Card
       who: 'player' | 'opponent'
+      target?: SpellTarget
     }
 
     const stream = await anthropic.messages.stream({
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: 'user',
-          content: createResolvePrompt(gameState, card, who)
+          content: createResolvePrompt(gameState, card, who, target)
         }
       ],
       system: RESOLVE_SYSTEM_PROMPT

@@ -1,4 +1,4 @@
-import { Card } from './types'
+import { Card, TargetType } from './types'
 
 // Icons from game-icons.net (CC BY 3.0 license)
 // Format: https://game-icons.net/icons/{foreground}/{background}/1x1/{author}/{icon}.svg
@@ -88,61 +88,71 @@ export const allCards: Card[] = [
   },
 
   // Spells
+  // targetType: 'none' = general effect, 'enemy_creature' = must target enemy creature,
+  // 'any_creature' = can target any creature, 'friendly_creature' = targets own creature
   {
     id: 'suspicious-fog',
     name: 'Suspicious Fog',
     flavor: 'It\'s definitely hiding something. What, exactly, remains unclear.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/fog.svg`
+    image: `${ICON_BASE}/lorc/fog.svg`,
+    targetType: 'none'
   },
   {
     id: 'definitely-not-a-trap',
     name: 'Definitely Not a Trap',
     flavor: 'Trust us. Would this card lie to you?',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/bear-trap.svg`
+    image: `${ICON_BASE}/lorc/bear-trap.svg`,
+    targetType: 'none'
   },
   {
     id: 'minor-inconvenience',
     name: 'Minor Inconvenience',
     flavor: 'Their shoelace is untied. Their coffee is cold. Their day is ruined.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/broken-heart.svg`
+    image: `${ICON_BASE}/lorc/broken-heart.svg`,
+    targetType: 'enemy_creature'
   },
   {
     id: 'chaos-ensues',
     name: 'Chaos Ensues',
     flavor: 'Something happens. No one knows what. Results may vary.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/tornado.svg`
+    image: `${ICON_BASE}/lorc/tornado.svg`,
+    targetType: 'none'
   },
   {
     id: 'aggressive-negotiations',
     name: 'Aggressive Negotiations',
     flavor: 'Diplomacy, but louder and with more fire.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/crossed-swords.svg`
+    image: `${ICON_BASE}/lorc/crossed-swords.svg`,
+    targetType: 'enemy_creature'
   },
   {
     id: 'reality-hiccup',
     name: 'Reality Hiccup',
     flavor: 'The universe blinks. Things are different now.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/magic-swirl.svg`
+    image: `${ICON_BASE}/lorc/magic-swirl.svg`,
+    targetType: 'none'
   },
   {
     id: 'sudden-inspiration',
     name: 'Sudden Inspiration',
     flavor: 'A brilliant idea strikes! Literally. It hurts a bit.',
     type: 'spell',
-    image: `${ICON_BASE}/delapouite/idea.svg`
+    image: `${ICON_BASE}/delapouite/idea.svg`,
+    targetType: 'none'
   },
   {
     id: 'borrowed-time',
     name: 'Borrowed Time',
     flavor: 'Take now, pay later. Interest rates are cosmic.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/hourglass.svg`
+    image: `${ICON_BASE}/lorc/hourglass.svg`,
+    targetType: 'none'
   },
 
   // New cards showcasing expanded mechanics
@@ -161,7 +171,8 @@ export const allCards: Card[] = [
     name: 'Glacial Blast',
     flavor: 'Brain freeze, but for your whole body.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/ice-bolt.svg`
+    image: `${ICON_BASE}/lorc/ice-bolt.svg`,
+    targetType: 'enemy_creature'
   },
 
   // Poison cards
@@ -178,7 +189,8 @@ export const allCards: Card[] = [
     name: 'Plague of Papercuts',
     flavor: 'Death by a thousand tiny inconveniences.',
     type: 'spell',
-    image: `${ICON_BASE}/delapouite/paper-wound.svg`
+    image: `${ICON_BASE}/delapouite/paper-wound.svg`,
+    targetType: 'enemy_creature'
   },
 
   // Taunt creature
@@ -223,7 +235,8 @@ export const allCards: Card[] = [
     name: 'Magical Bubble',
     flavor: 'Pop-resistant, but not criticism-resistant.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/bubble-field.svg`
+    image: `${ICON_BASE}/lorc/bubble-field.svg`,
+    targetType: 'friendly_creature'
   },
   {
     id: 'armored-armadillo',
@@ -248,7 +261,8 @@ export const allCards: Card[] = [
     name: 'Arcane Heist',
     flavor: 'Your mana is my mana. My mana is also my mana.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/hand.svg`
+    image: `${ICON_BASE}/lorc/hand.svg`,
+    targetType: 'none'
   },
 
   // Discard cards
@@ -265,7 +279,8 @@ export const allCards: Card[] = [
     name: 'Forgetfulness',
     flavor: 'What were we talking about? Who are you? Who am I?',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/brain-freeze.svg`
+    image: `${ICON_BASE}/lorc/brain-freeze.svg`,
+    targetType: 'none'
   },
 
   // Mill cards
@@ -282,7 +297,8 @@ export const allCards: Card[] = [
     name: 'Paper Shredder',
     flavor: 'Your carefully crafted plans? Gone. Confetti now.',
     type: 'spell',
-    image: `${ICON_BASE}/delapouite/paper-shredder.svg`
+    image: `${ICON_BASE}/delapouite/paper-shredder.svg`,
+    targetType: 'none'
   },
 
   // Steal cards
@@ -299,7 +315,8 @@ export const allCards: Card[] = [
     name: 'Mind Swap',
     flavor: 'I\'ll take that. You can have... nothing.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/brain.svg`
+    image: `${ICON_BASE}/lorc/brain.svg`,
+    targetType: 'enemy_creature'
   },
 
   // Transform cards
@@ -308,7 +325,8 @@ export const allCards: Card[] = [
     name: 'Chaotic Polymorph',
     flavor: 'You wanted a dragon? Best I can do is a very confused sheep.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/sheep.svg`
+    image: `${ICON_BASE}/lorc/sheep.svg`,
+    targetType: 'any_creature'
   },
   {
     id: 'witch-of-whims',
@@ -333,7 +351,8 @@ export const allCards: Card[] = [
     name: 'Doppelganger Dust',
     flavor: 'Sprinkle on enemy, receive free copy. Side effects may include existential dread.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/powder.svg`
+    image: `${ICON_BASE}/lorc/powder.svg`,
+    targetType: 'any_creature'
   },
 
   // Bounce cards
@@ -350,7 +369,8 @@ export const allCards: Card[] = [
     name: 'Return to Sender',
     flavor: 'Address unknown. No such creature. No such threat.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/return-arrow.svg`
+    image: `${ICON_BASE}/lorc/return-arrow.svg`,
+    targetType: 'any_creature'
   },
 
   // Doomed creatures (high stats but die at end of turn)
@@ -367,7 +387,8 @@ export const allCards: Card[] = [
     name: 'Doomed Prophecy',
     flavor: 'The stars align to say: you\'re about to have a very bad day.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/death-skull.svg`
+    image: `${ICON_BASE}/lorc/death-skull.svg`,
+    targetType: 'enemy_creature'
   },
 
   // Summon token cards
@@ -376,7 +397,8 @@ export const allCards: Card[] = [
     name: 'Rabbit Hat',
     flavor: 'The classic trick! The rabbit isn\'t impressed either.',
     type: 'spell',
-    image: `${ICON_BASE}/lorc/top-hat.svg`
+    image: `${ICON_BASE}/lorc/top-hat.svg`,
+    targetType: 'none'
   },
   {
     id: 'swarm-caller',
