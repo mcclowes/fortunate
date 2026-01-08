@@ -86,7 +86,7 @@ async function playNext() {
   if (!audioUrl || !state.enabled) {
     state = { ...state, isPlaying: false }
     notifyListeners()
-    playNext() // Try next in queue
+    playNext()
     return
   }
 
@@ -97,7 +97,7 @@ async function playNext() {
     URL.revokeObjectURL(audioUrl)
     state = { ...state, isPlaying: false, currentAudio: null }
     notifyListeners()
-    playNext() // Play next in queue
+    playNext()
   }
 
   audio.onerror = () => {
@@ -105,7 +105,7 @@ async function playNext() {
     URL.revokeObjectURL(audioUrl)
     state = { ...state, isPlaying: false, currentAudio: null }
     notifyListeners()
-    playNext() // Try next in queue
+    playNext()
   }
 
   try {

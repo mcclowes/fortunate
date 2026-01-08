@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
         'xi-api-key': apiKey,
       },
       body: JSON.stringify({
-        text: text.slice(0, 500), // Limit text length to control costs
-        model_id: 'eleven_turbo_v2_5', // Fast, low-latency model
+        text: text.slice(0, 500),
+        model_id: 'eleven_turbo_v2_5',
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75,
@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Stream the audio response back
     const audioBuffer = await response.arrayBuffer()
 
     return new NextResponse(audioBuffer, {

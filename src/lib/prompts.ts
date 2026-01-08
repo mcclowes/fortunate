@@ -20,12 +20,20 @@ function formatCreature(c: Creature): string {
   return `${c.name}[${c.instanceId}](${stats}${shield})${statuses}`
 }
 
-export const RESOLVE_SYSTEM_PROMPT = `Narrate card effects in a whimsical card game. Be creative but brief (1-2 sentences).
+export const RESOLVE_SYSTEM_PROMPT = `Narrate card effects in a whimsical card game.
 
-IMPORTANT: Build on the ongoing battle story! Reference previous events, escalate tension, develop rivalries between creatures, and make each moment feel like part of an epic tale. If a creature was previously wounded or a spell was cast, acknowledge that history.
+STRICT LENGTH LIMIT: Maximum 15 words. One punchy sentence. No flowery descriptions.
+Reference battle history (grudges, revenge) but stay under 15 words.
+Example good: "Wolf Mother howls, summoning wolves to avenge the fallen Crab."
+Example bad: "Wolf Mother lets out a haunting howl that echoes across the battlefield. Spectral wolf tokens materialize around her, their translucent forms padding silently beside their fierce matriarch."
 
 Respond with JSON only:
 {"narrative": "What happens", "changes": [StateChange, ...]}
+
+CRITICAL - Target meanings (from CASTER's perspective):
+- "player" = the CASTER (whoever is playing the card)
+- "opponent" = the ENEMY of the caster
+So if the card damages enemies, use target: "opponent". If it heals the caster, use target: "player".
 
 StateChange types:
 - {"type": "damage", "target": "player|opponent|creature", "targetId": "id-if-creature", "value": number}
@@ -114,7 +122,9 @@ Hand:[${hand}] Pick ONE card index to play, or "pass" to skip playing a card.`
 }
 
 export const CREATURE_ACTION_SYSTEM_PROMPT = `Creature acts based on personality. JSON only:
-{"action": "attack_creature|attack_hero|special", "targetId": "id", "narrative": "1 sentence", "changes": []}
+{"action": "attack_creature|attack_hero|special", "targetId": "id", "narrative": "max 10 words", "changes": []}
+
+STRICT: Narrative must be under 10 words. Example: "Crab pinches the Knight for 2 damage."
 
 70% attack, 30% personality-based special ability.
 
@@ -128,7 +138,7 @@ Available tokens: rabbit-token, bee-token, skeleton-token, spectral-knight-token
 
 Note: Creatures with taunt MUST be attacked first. Stealthed creatures can't be targeted.
 
-IMPORTANT: The creature remembers the battle! If it has history with an enemy creature (fought before, watched an ally fall), reference that. Build rivalries, vendettas, and heroic moments.`
+Reference battle history briefly - grudges, revenge, fallen allies - but keep it under 10 words.`
 
 export function createCreatureActionPrompt(
   creature: Creature,
@@ -149,21 +159,19 @@ Enemy: ${enemyState.health}hp, creatures: ${enemies}${tauntWarning}`
 }
 
 // Combat phase prompt - resolves all creature attacks in one narrative
-export const COMBAT_PHASE_SYSTEM_PROMPT = `You are the narrator for a combat phase in a whimsical card game. All creatures attack automatically.
+export const COMBAT_PHASE_SYSTEM_PROMPT = `Narrator for combat phase. All creatures attack automatically.
 
 Respond with JSON only:
-{"narrative": "Dramatic 2-4 sentence narrative describing ALL attacks", "attacks": [{"attackerId": "id", "targetId": "id-or-hero"}, ...]}
+{"narrative": "One sentence, max 20 words", "attacks": [{"attackerId": "id", "targetId": "id-or-hero"}, ...]}
+
+STRICT: Keep narrative to ONE sentence, max 20 words total. Example: "The wolves lunge at the hero while Crab snaps at the Knight."
 
 Rules:
-- Each creature that canAttack MUST be included in the attacks array
-- Creatures with frozen status CANNOT attack (skip them)
-- If enemy has TAUNT creatures, those must be targeted first
+- Each creature that canAttack MUST be in attacks array
+- Frozen creatures CANNOT attack
+- TAUNT creatures must be targeted first
 - STEALTH creatures cannot be targeted
-- Use "hero" as targetId to attack the enemy hero directly
-- Make the narrative dramatic and fun! Describe each creature's attack with personality
-- Build on battle history - reference grudges, revenge, heroic moments
-
-IMPORTANT: Every creature that can attack should attack. The "attacks" array should have one entry per attacking creature.`
+- Use "hero" as targetId to attack enemy hero`
 
 export function createCombatPhasePrompt(
   gameState: GameState,
