@@ -11,17 +11,28 @@ type HandProps = {
 }
 
 export default function Hand({ cards, isOpponent, onPlayCard }: HandProps) {
+  // Show card backs for opponent's hand
+  if (isOpponent) {
+    return (
+      <div className={`${styles.hand} ${styles.opponent}`}>
+        {cards.map((_, index) => (
+          <div key={index} className={styles.cardBack}>
+            <span className={styles.cardBackIcon}>?</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
-    <div className={`${styles.hand} ${isOpponent ? styles.opponent : ''}`}>
+    <div className={styles.hand}>
       {cards.map((card, index) => {
-        // Cards are playable if we're not the opponent and onPlayCard is provided
-        const isPlayable = !isOpponent && !!onPlayCard
+        const isPlayable = !!onPlayCard
         return (
           <div key={`${card.id}-${index}`} className={styles.handCard}>
             <Card
               card={card}
               playable={isPlayable}
-              isOpponent={isOpponent}
               onClick={isPlayable ? () => onPlayCard(index) : undefined}
             />
           </div>

@@ -550,7 +550,48 @@ function BoardInner() {
             />
           </div>
 
-          <div className={styles.divider} />
+          <div className={styles.centerArea}>
+            <div className={styles.divider} />
+
+            <div className={styles.turnIndicator}>
+              {isLoading ? (
+                <div className={styles.loading}>
+                  <div className={styles.spinner} />
+                  {streamingText ? (
+                    <span className={styles.streamingText}>{streamingText}</span>
+                  ) : (
+                    <span>The fates deliberate...</span>
+                  )}
+                </div>
+              ) : targetingSpell ? (
+                <span className={styles.targetingText}>Select a target for {targetingSpell.name}</span>
+              ) : (
+                <span className={styles.turnText}>
+                  {isPlayerTurn ? (gameState.hasPlayedCard ? 'Card played! Combat begins...' : 'Your turn') : "Opponent's turn"}
+                </span>
+              )}
+            </div>
+
+            <div className={styles.centerControls}>
+              {targetingSpell ? (
+                <button
+                  className={styles.cancelBtn}
+                  onClick={handleCancelTargeting}
+                >
+                  Cancel
+                </button>
+              ) : isPlayerTurn && !gameState.hasPlayedCard && !isLoading ? (
+                <button
+                  className={styles.endTurnBtn}
+                  onClick={handleSkipCard}
+                >
+                  End Turn
+                </button>
+              ) : null}
+            </div>
+
+            <div className={styles.divider} />
+          </div>
 
           <div ref={playerFieldRef}>
             <Field
@@ -583,40 +624,7 @@ function BoardInner() {
           </div>
         </div>
 
-        <div className={styles.status}>
-          {isLoading ? (
-            <div className={styles.loading}>
-              <div className={styles.spinner} />
-              {streamingText ? (
-                <span className={styles.streamingText}>{streamingText}</span>
-              ) : (
-                <span>The fates deliberate...</span>
-              )}
-            </div>
-          ) : targetingSpell ? (
-            <span>Select a target for {targetingSpell.name}</span>
-          ) : (
-            <span>{isPlayerTurn ? (gameState.hasPlayedCard ? 'Card played! Combat begins...' : 'Your turn - play a card or skip') : "Opponent's turn"}</span>
-          )}
-        </div>
-
         <div className={styles.controls}>
-          {targetingSpell ? (
-            <button
-              className={styles.cancelBtn}
-              onClick={handleCancelTargeting}
-            >
-              Cancel
-            </button>
-          ) : (
-            <button
-              className={styles.endTurnBtn}
-              onClick={handleSkipCard}
-              disabled={!canAct || gameState.hasPlayedCard}
-            >
-              Skip Card
-            </button>
-          )}
           <button className={styles.restartBtn} onClick={handleRestart}>
             New Game
           </button>
