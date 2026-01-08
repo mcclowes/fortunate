@@ -409,12 +409,11 @@ export const allCards: Card[] = [
     baseStats: { attack: 2, health: 3 }
   },
 
-  // Card draw cards
+// Card draw cards
   {
     id: 'curious-cat',
     name: 'Curious Cat',
     flavor: 'Knocked over your deck just to see what was inside.',
-    cost: 1,
     type: 'creature',
     image: `${ICON_BASE}/lorc/cat.svg`,
     baseStats: { attack: 1, health: 1 }
@@ -423,7 +422,6 @@ export const allCards: Card[] = [
     id: 'knowledge-hoarder',
     name: 'Knowledge Hoarder',
     flavor: 'Collects facts like others collect coins. Equally useless in combat.',
-    cost: 3,
     type: 'creature',
     image: `${ICON_BASE}/lorc/raven.svg`,
     baseStats: { attack: 2, health: 3 }
@@ -432,23 +430,22 @@ export const allCards: Card[] = [
     id: 'library-card',
     name: 'Library Card',
     flavor: 'The most powerful card of all. Grants access to infinite knowledge. And late fees.',
-    cost: 1,
     type: 'spell',
-    image: `${ICON_BASE}/delapouite/bookmarklet.svg`
+    image: `${ICON_BASE}/delapouite/bookmarklet.svg`,
+    targetType: 'none'
   },
   {
     id: 'eureka-moment',
     name: 'Eureka Moment',
     flavor: 'That feeling when you finally understand. Then immediately forget.',
-    cost: 3,
     type: 'spell',
-    image: `${ICON_BASE}/lorc/light-bulb.svg`
+    image: `${ICON_BASE}/lorc/light-bulb.svg`,
+    targetType: 'none'
   },
   {
     id: 'scroll-scrounger',
     name: 'Scroll Scrounger',
     flavor: 'One wizard\'s trash is another wizard\'s treasure. Mostly trash though.',
-    cost: 2,
     type: 'creature',
     image: `${ICON_BASE}/lorc/scroll-unfurled.svg`,
     baseStats: { attack: 1, health: 2 }
@@ -457,9 +454,91 @@ export const allCards: Card[] = [
     id: 'desperate-research',
     name: 'Desperate Research',
     flavor: 'When the deadline looms, any source becomes valid. Even this one.',
-    cost: 2,
     type: 'spell',
-    image: `${ICON_BASE}/delapouite/bookshelf.svg`
+    image: `${ICON_BASE}/delapouite/bookshelf.svg`,
+    targetType: 'none'
+  },
+
+  // Summoning-focused cards
+  {
+    id: 'necromancers-call',
+    name: 'Necromancer\'s Call',
+    flavor: 'The dead answer. They always do. They\'re not busy.',
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/raise-zombie.svg`,
+    targetType: 'none'
+  },
+  {
+    id: 'goblin-war-drum',
+    name: 'Goblin War Drum',
+    flavor: 'WAAAGH! Or however goblins spell it.',
+    type: 'spell',
+    image: `${ICON_BASE}/delapouite/drum.svg`,
+    targetType: 'none'
+  },
+  {
+    id: 'spirit-medium',
+    name: 'Spirit Medium',
+    flavor: 'Talks to ghosts. They never shut up about the old days.',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/crystal-ball.svg`,
+    baseStats: { attack: 2, health: 4 }
+  },
+  {
+    id: 'flame-conjurer',
+    name: 'Flame Conjurer',
+    flavor: 'Summons fire friends. They\'re warm but terrible huggers.',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/flame.svg`,
+    baseStats: { attack: 2, health: 2 }
+  },
+  {
+    id: 'grove-guardian',
+    name: 'Grove Guardian',
+    flavor: 'Where they walk, forests follow. Slowly.',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/oak.svg`,
+    baseStats: { attack: 3, health: 4 }
+  },
+  {
+    id: 'army-in-a-bottle',
+    name: 'Army in a Bottle',
+    flavor: 'Just add water. And chaos. Mostly chaos.',
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/drink-me.svg`,
+    targetType: 'none'
+  },
+  {
+    id: 'portal-of-chaos',
+    name: 'Portal of Chaos',
+    flavor: 'Step right up! No refunds. No returns. No survivors guaranteed.',
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/portal.svg`,
+    targetType: 'none'
+  },
+  {
+    id: 'wolf-mother',
+    name: 'Wolf Mother',
+    flavor: 'Her children are everywhere. And hungry.',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/wolf-head.svg`,
+    baseStats: { attack: 3, health: 3 }
+  },
+  {
+    id: 'wisp-weaver',
+    name: 'Wisp Weaver',
+    flavor: 'Spins magical threads into tiny annoying friends.',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/magic-palm.svg`,
+    baseStats: { attack: 1, health: 3 }
+  },
+  {
+    id: 'undead-horde',
+    name: 'Undead Horde',
+    flavor: 'They keep coming. The graveyard has a lot of residents.',
+    type: 'spell',
+    image: `${ICON_BASE}/lorc/graveyard.svg`,
+    targetType: 'none'
   }
 ]
 
@@ -509,6 +588,70 @@ export const tokenCreatures: Card[] = [
     image: `${ICON_BASE}/lorc/skeleton.svg`,
     baseStats: { attack: 2, health: 1 },
     isToken: true
+  },
+  // New summoning tokens
+  {
+    id: 'spectral-knight-token',
+    name: 'Spectral Knight',
+    flavor: 'Still bound by honor. Also transparent.',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/mounted-knight.svg`,
+    baseStats: { attack: 2, health: 2 },
+    isToken: true
+  },
+  {
+    id: 'flame-imp-token',
+    name: 'Flame Imp',
+    flavor: 'Small, angry, and very flammable. Wait, inflammable?',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/imp.svg`,
+    baseStats: { attack: 2, health: 1 },
+    isToken: true
+  },
+  {
+    id: 'treant-token',
+    name: 'Treant',
+    flavor: 'A tree that walks. Leaf it alone.',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/trefoil-lily.svg`,
+    baseStats: { attack: 2, health: 3 },
+    isToken: true
+  },
+  {
+    id: 'zombie-token',
+    name: 'Shambling Zombie',
+    flavor: 'Not fast, but very persistent. Like Monday mornings.',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/shambling-zombie.svg`,
+    baseStats: { attack: 2, health: 2 },
+    isToken: true
+  },
+  {
+    id: 'goblin-grunt-token',
+    name: 'Goblin Grunt',
+    flavor: 'Paid in shinies. Works for chaos.',
+    type: 'creature',
+    image: `${ICON_BASE}/caro-asercion/goblin-head.svg`,
+    baseStats: { attack: 1, health: 1 },
+    isToken: true
+  },
+  {
+    id: 'wisp-token',
+    name: 'Arcane Wisp',
+    flavor: 'A fragment of pure magical energy. Pew pew.',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/fluffy-swirl.svg`,
+    baseStats: { attack: 1, health: 1 },
+    isToken: true
+  },
+  {
+    id: 'wolf-token',
+    name: 'Spirit Wolf',
+    flavor: 'Howls at both moons. Yes, both of them.',
+    type: 'creature',
+    image: `${ICON_BASE}/lorc/wolf-howl.svg`,
+    baseStats: { attack: 2, health: 1 },
+    isToken: true
   }
 ]
 
@@ -529,4 +672,18 @@ export function createStarterDeck(): Card[] {
 // Helper to get a random token for transform effects
 export function getRandomToken(): Card {
   return tokenCreatures[Math.floor(Math.random() * tokenCreatures.length)]
+}
+
+// Helper to get a specific token by ID for summoning effects
+export function getTokenById(id: string): Card | undefined {
+  return tokenCreatures.find(t => t.id === id)
+}
+
+// Helper to get multiple random tokens (for multi-summon effects)
+export function getRandomTokens(count: number): Card[] {
+  const tokens: Card[] = []
+  for (let i = 0; i < count; i++) {
+    tokens.push(getRandomToken())
+  }
+  return tokens
 }

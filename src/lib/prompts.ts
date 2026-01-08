@@ -39,7 +39,21 @@ StateChange types:
 - {"type": "apply_status", "target": "creature", "targetId": "id", "status": "frozen|poisoned|taunt|stealth|silenced|doomed"}
 - {"type": "remove_status", "target": "creature", "targetId": "id", "status": "status-name"}
 - {"type": "add_shield", "target": "creature", "targetId": "id", "value": amount}
-- {"type": "summon", "target": "player|opponent", "card": {id,name,flavor,type:"creature",baseStats:{attack,health}}}
+- {"type": "summon", "target": "player|opponent", "card": {id,name,flavor,type:"creature",baseStats:{attack,health},isToken:true}}
+
+Available tokens for summoning (use these exact ids):
+- rabbit-token (1/1) - Magic Rabbit
+- bee-token (1/1) - Angry Bee
+- skeleton-token (2/1) - Spooky Skeleton
+- spectral-knight-token (2/2) - Spectral Knight
+- flame-imp-token (2/1) - Flame Imp
+- treant-token (2/3) - Treant
+- zombie-token (2/2) - Shambling Zombie
+- goblin-grunt-token (1/1) - Goblin Grunt
+- wisp-token (1/1) - Arcane Wisp
+- wolf-token (2/1) - Spirit Wolf
+
+Summoning cards should summon thematic tokens (e.g., necromancer summons skeletons/zombies, nature cards summon treants).
 - {"type": "steal_creature", "target": "creature", "targetId": "creature-id"}
 - {"type": "transform", "target": "creature", "targetId": "id", "card": {creature-card}}
 - {"type": "copy_creature", "target": "player|opponent", "targetId": "creature-to-copy"}
@@ -47,7 +61,9 @@ StateChange types:
 
 Status effects: frozen (skip attack), poisoned (1 dmg/turn), taunt (must be attacked), stealth (untargetable), silenced (no abilities), doomed (dies end of turn)
 
-Effect scale: Small effects = 1-2 damage/+1 buff. Medium effects = 2-3 damage or status. Big effects = 4-5 damage or multiple effects. Creatures already summoned - describe entry effects only.`
+Effect scale: Small effects = 1-2 damage/+1 buff. Medium effects = 2-3 damage or status. Big effects = 4-5 damage or multiple effects. Creatures already summoned - describe entry effects only.
+
+Summoning scale: Small summoners = 1 token. Medium summoners = 1-2 tokens. Big summoners = 2-3 tokens. Creature summoners summon tokens as entry effect.`
 
 export function createResolvePrompt(
   gameState: GameState,
@@ -106,6 +122,9 @@ For special actions, use StateChange format:
 - damage/heal/destroy/buff/debuff creatures
 - apply_status with "status": "frozen|poisoned|taunt|stealth|silenced|doomed"
 - add_shield, steal_creature, bounce, copy_creature
+- summon tokens (summoner creatures like Spirit Medium, Flame Conjurer, Wolf Mother can summon thematic tokens)
+
+Available tokens: rabbit-token, bee-token, skeleton-token, spectral-knight-token, flame-imp-token, treant-token, zombie-token, goblin-grunt-token, wisp-token, wolf-token
 
 Note: Creatures with taunt MUST be attacked first. Stealthed creatures can't be targeted.
 
