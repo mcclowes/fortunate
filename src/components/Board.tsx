@@ -12,9 +12,11 @@ import {
 } from '@/lib/gameState'
 import { playSound, playSoundForStateChange, ensureAudioReady } from '@/lib/sounds'
 import { ParticleProvider, useParticles, ParticleType } from './ParticleEffect'
+import { useNarration } from '@/hooks/useNarration'
 import Hand from './Hand'
 import Field from './Field'
 import GameLog from './GameLog'
+import NarrationToggle from './NarrationToggle'
 import styles from '@/styles/Board.module.scss'
 
 export default function Board() {
@@ -30,6 +32,7 @@ function BoardInner() {
   const [isLoading, setIsLoading] = useState(false)
   const [streamingText, setStreamingText] = useState<string>('')
   const { emit } = useParticles()
+  const { narrate, clear: clearNarration } = useNarration()
 
   // Spell targeting state
   const [targetingSpell, setTargetingSpell] = useState<Card | null>(null)
@@ -187,6 +190,9 @@ function BoardInner() {
         emitEffectForChange(change)
       })
 
+      // Queue narration for the card effect
+      narrate(result.narrative)
+
       let newState = applyStateChanges(state, result.changes)
       newState = addLogEntry(newState, who, result.narrative)
       return newState
@@ -242,8 +248,9 @@ function BoardInner() {
       // Execute all attacks
       let newState = executeBatchCombat(state, who, result.attacks)
 
-      // Add combat narrative to log
+      // Add combat narrative to log and queue narration
       if (result.narrative) {
+        narrate(result.narrative)
         newState = addLogEntry(newState, who, result.narrative)
       }
 
@@ -501,9 +508,10 @@ function BoardInner() {
   }, [resolveCardEffect, executeCombatPhase, emit])
 
   const handleRestart = useCallback(() => {
+    clearNarration()
     setGameState(createInitialGameState())
     setIsLoading(false)
-  }, [])
+  }, [clearNarration])
 
   if (!gameState) {
     return (
@@ -625,6 +633,7 @@ function BoardInner() {
         </div>
 
         <div className={styles.controls}>
+          <NarrationToggle />
           <button className={styles.restartBtn} onClick={handleRestart}>
             New Game
           </button>
