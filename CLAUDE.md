@@ -220,6 +220,8 @@ Recommended additions: Jest, React Testing Library, Playwright
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes | Your Anthropic API key for Claude access |
+| `ELEVENLABS_API_KEY` | No | ElevenLabs API key for voice narration |
+| `ELEVENLABS_VOICE_ID` | No | Custom voice ID (default: Rachel - 21m00Tcm4TlvDq8ikWAM) |
 
 ## Troubleshooting
 
@@ -228,3 +230,4 @@ Recommended additions: Jest, React Testing Library, Playwright
 - **Cards not playing**: Verify mana cost doesn't exceed current mana
 - **Creatures can't attack**: They cannot attack the turn they're summoned
 - **JSON parse errors**: Check Claude response format in API routes
+- **Narration not working**: Ensure ELEVENLABS_API_KEY is set and the toggle is enabled
